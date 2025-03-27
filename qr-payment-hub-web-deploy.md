@@ -30,6 +30,15 @@
    npm install tailwindcss postcss autoprefixer
    npx tailwindcss init -p
    
+   # UI コンポーネント
+   npx shadcn-ui@latest init
+   
+   # コンポーネントのインストール (必要に応じて)
+   npx shadcn-ui@latest add button card dialog form input
+   
+   # アイコンとUI拡張
+   npm install lucide-react sonner react-hook-form zod @hookform/resolvers
+   
    # 開発ツール
    npm install -D @types/qrcode.react
    ```
@@ -245,3 +254,243 @@ export default function PaymentAppCard({ app, isMobile }) {
     // タイムアウトでアプリ起動確認
     const timeout = setTimeout(() => {
       // アプリが起動
+```
+
+## 4. MCP (Minimum Competitive Product) 実装状況
+
+MCPの実装が完了しました。現在の実装状況は以下の通りです：
+
+### アプリケーションデータフロー
+
+```mermaid
+flowchart TD
+    User([ユーザー]) <--> App[QRアプリHub]
+    
+    subgraph "クライアント側"
+        App -->|閲覧| Dashboard[ダッシュボード]
+        App -->|設定| Settings[設定画面]
+        Dashboard -->|タップ/選択| PaymentCard[決済アプリカード]
+        
+        PaymentCard -->|モバイル| Launch[URLスキーム起動]
+        PaymentCard -->|PC| QR[QRコード表示]
+    end
+    
+    subgraph "サーバー側"
+        App -->|API呼び出し| NextAPI[Next.js API Routes]
+        NextAPI -->|データ操作| Supabase[(Supabase)]
+    end
+    
+    subgraph "外部連携"
+        Launch --> PaymentApps([QR決済アプリ])
+        QR -->|スキャン| PaymentApps
+        Launch -->|未インストール| Store([アプリストア])
+    end
+    
+    User <--> PaymentApps
+```
+
+### 実装済み機能
+
+1. **基本的なQR決済アプリへのアクセス機能**
+   - モバイル端末でのURLスキームを利用した決済アプリ起動
+   - PC環境でのQRコード表示によるモバイル連携
+   - アプリがインストールされていない場合のストア誘導
+
+2. **UIコンポーネント**
+   - Next.js App RouterとTypeScriptによる実装
+   - モダンなUI/UXと完全レスポンシブデザイン
+   - shadcn/uiを活用したアクセシブルなコンポーネント
+   - ダークモード対応
+   - サブスクリプションベースのデータ取得
+
+3. **APIエンドポイント**
+   - 決済アプリ情報取得API
+   - ユーザー設定保存API
+
+### 技術スタック
+
+- **フロントエンド**: 
+  - Next.js 15.2.4 (App Router)
+  - React 19
+  - TypeScript
+  - Tailwind CSS
+  - Turbopack
+  - shadcn/ui (Radixベースのコンポーネント)
+  
+- **データ管理**:
+  - SWR
+  - Supabase SDK
+
+- **UI/UX**:
+  - Lucide React (アイコン)
+  - Sonner (通知システム)
+  - QRCode.react
+  - React Hook Form
+  - Zod (バリデーション)
+
+- **デプロイ**: Vercel
+
+### 次のステップ
+
+1. **拡張機能開発**
+   - 残高表示機能（各アプリのAPIが提供する場合）
+   - キャンペーン情報表示
+   - ユーザー設定の詳細カスタマイズ
+
+2. **認証強化**
+   - ソーシャルログイン対応
+   - パスワードレス認証の実装
+
+3. **パフォーマンス最適化**
+   - 画像最適化
+   - バンドルサイズの削減
+   - キャッシュ戦略の最適化
+
+## 5. 本番環境デプロイ手順
+
+### デプロイフロー
+
+```mermaid
+graph TD
+    A[開発環境] -->|コミット| B[Gitリポジトリ]
+    B -->|CI/CD連携| C[Vercel]
+    
+    C -->|自動ビルド| D[ビルドプロセス]
+    D -->|ビルド成功| E[本番環境]
+    D -->|ビルド失敗| F[エラー通知]
+    F --> G[修正]
+    G --> A
+    
+    H[プルリクエスト] --> I[プレビュー環境]
+    I --> J{レビュー}
+    J -->|承認| B
+    J -->|修正要求| G
+    
+    subgraph "環境変数"
+        ENV1[Supabase URL]
+        ENV2[Supabase API Key]
+    end
+    
+    ENV1 --> C
+    ENV2 --> C
+    
+    E -->|健全性チェック| K[監視]
+    K -->|警告| L[アラート]
+    
+    E -->|ドメイン設定| M[カスタムドメイン]
+    M -->|DNSレコード| N[ユーザーアクセス]
+```
+
+### Vercelへのデプロイ設定と実行
+
+1. **Vercelアカウントの作成**
+   - [Vercel公式サイト](https://vercel.com/)にアクセス
+   - GitHubアカウントなどでサインアップ
+
+2. **プロジェクトのインポート**
+   ```bash
+   # Vercel CLIのインストール
+   npm install -g vercel
+   
+   # プロジェクトディレクトリで実行
+   cd qr-app
+   vercel
+   ```
+
+   または、Vercelダッシュボードから「New Project」を選択し、GitHubリポジトリを連携
+
+3. **環境変数の設定**
+
+   Vercelのプロジェクト設定から以下の環境変数を設定します：
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+4. **ビルド設定の確認**
+
+   - フレームワークプリセット: `Next.js`
+   - ビルドコマンド: `next build`
+   - 出力ディレクトリ: `.next`
+   - インストールコマンド: `npm install`
+
+5. **デプロイの実行**
+
+   設定を確認後、「Deploy」ボタンをクリックしてデプロイを開始します。
+
+6. **デプロイ後の確認**
+
+   - デプロイが完了したら、提供されたURLにアクセスして動作確認
+   - 必要に応じてカスタムドメインを設定
+
+### カスタムドメインの設定
+
+1. **ドメインの購入**
+   - お好みのドメインレジストラでドメインを購入
+
+2. **Vercelプロジェクトへのドメイン追加**
+   - Vercelダッシュボードの「Domains」セクションから「Add」をクリック
+   - 購入したドメインを入力
+
+3. **DNSレコードの設定**
+   - Vercelが提供する指示に従って、ドメインレジストラでDNSレコードを設定
+   - 主に以下のレコードが必要:
+     - A レコード: @ → 76.76.21.21
+     - CNAME レコード: www → cname.vercel-dns.com
+
+4. **SSL/TLS証明書の自動設定**
+   - Vercelは自動的にSSL証明書を発行・更新
+
+### 継続的デプロイ（CI/CD）の設定
+
+1. **GitHubリポジトリとの連携**
+   - Vercelプロジェクト設定の「Git」タブから、GitHubリポジトリと連携
+
+2. **自動デプロイの設定**
+   - 「Production Branch」を `main` または `master` に設定
+   - プレビュー機能を有効化して、プルリクエストごとのプレビューデプロイを設定
+
+3. **ブランチデプロイルールの設定**
+   - 開発環境、ステージング環境、本番環境などの複数環境を管理する場合、
+     ブランチごとのデプロイ設定を行います
+
+### 現在の実行状況
+
+現在のアプリケーションは開発サーバーで実行中です：
+
+```
+> qr-app@0.1.0 dev
+> next dev --turbopack
+ ⚠ Port 3000 is in use, trying 3001 instead.
+   ▲ Next.js 15.2.4 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.0.6:3001
+   - Environments: .env.local
+ ✓ Starting...
+ ✓ Ready in 787ms
+```
+
+本番環境では、次のコマンドでビルドと起動を行います：
+
+```bash
+# プロダクションビルド
+npm run build
+
+# 本番サーバー起動
+npm run start
+```
+
+### 監視とメンテナンス
+
+1. **エラー監視の設定**
+   - Vercel Analytics の設定
+   - Sentry などの外部エラー監視ツールの統合
+
+2. **パフォーマンス監視**
+   - Vercel Analytics でのパフォーマンス指標モニタリング
+   - Google Analytics の設定
+
+3. **定期的なアップデート**
+   - 依存パッケージの更新
+   - セキュリティパッチの適用
+   - Node.js バージョンの更新

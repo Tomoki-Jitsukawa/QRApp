@@ -21,11 +21,18 @@
   - SEO対策が容易
   - レスポンシブデザインの実装が容易
   - TypeScriptサポート
+  - App Routerによる最新のサーバーコンポーネントモデル
 
 - **スタイリング**: Tailwind CSS
   - ユーティリティファーストのアプローチ
   - レスポンシブデザインの効率的な構築
   - カスタマイズ性の高さ
+
+- **UIコンポーネント**: shadcn/ui
+  - Radix UIをベースとした高品質コンポーネント
+  - アクセシビリティ対応
+  - ダークモード対応
+  - カスタマイズ可能なコンポーネント設計
 
 ### バックエンド
 - **フレームワーク**: Next.js API Routes
@@ -57,26 +64,54 @@
 
 ### プロジェクト構成
 ```
-src/
-├── pages/              // Next.jsのページコンポーネント
-│   ├── index.tsx       // ホームページ（ダッシュボード）
-│   ├── auth/           // 認証関連ページ
-│   ├── settings/       // 設定ページ
-│   └── api/            // APIエンドポイント
-├── components/         // 再利用可能なコンポーネント
-│   ├── Layout.tsx      // 共通レイアウト
+app/
+├── components/            // 主要コンポーネント
+│   ├── Dashboard.tsx      // メインダッシュボード
 │   ├── PaymentAppCard.tsx // 決済アプリカード
-│   └── BalanceDisplay.tsx // 残高表示（フェーズ2）
-├── lib/                // ユーティリティ関数
-│   ├── supabase.ts     // Supabase クライアント
-│   └── deepLink.ts     // ディープリンク関数
-├── hooks/              // カスタムReactフック
-│   ├── useAuth.ts      // 認証フック
-│   └── usePaymentApps.ts // 決済アプリデータフック
-├── types/              // TypeScript型定義
-│   └── index.ts        // 共通型定義
-└── styles/             // グローバルスタイル
-    └── globals.css     // Tailwind CSS設定
+│   └── Layout.tsx         // 共通レイアウト
+├── hooks/                 // カスタムフック
+│   ├── useAuth.ts         // 認証処理
+│   └── usePaymentApps.ts  // 決済アプリデータ取得
+├── lib/                   // ユーティリティ
+│   ├── supabase.ts        // Supabase連携
+│   └── deepLink.ts        // アプリ起動関連
+├── api/                   // APIルートエンドポイント
+│   └── payment-apps/      // 決済アプリAPI
+├── types/                 // 型定義
+├── page.tsx               // ホームページ
+└── layout.tsx             // 基本レイアウト
+```
+
+### アーキテクチャ構成図
+
+```mermaid
+graph TD
+    Client[クライアント] --> NextJS[Next.js App]
+    NextJS --> API[API Routes]
+    NextJS --> UI[UIコンポーネント]
+    NextJS --> Hooks[カスタムフック]
+    
+    API --> Supabase[Supabase]
+    Hooks --> Supabase
+    
+    UI --> PCView[PC向け表示]
+    UI --> MobileView[モバイル向け表示]
+    
+    PCView --> QRCode[QRコード表示]
+    MobileView --> DeepLink[ディープリンク]
+    
+    DeepLink --> PaymentApps[QR決済アプリ]
+    QRCode --> |スキャン| PaymentApps
+    
+    subgraph "バックエンド"
+        Supabase --> DB[(データベース)]
+        Supabase --> Auth[認証システム]
+    end
+    
+    subgraph "フロントエンド"
+        UI
+        Hooks
+    end
 ```
 
 ### データモデル (Supabase)
@@ -239,13 +274,9 @@ import useSWR from 'swr';
 
 export function usePaymentApps() {
   const { data, error, mutate } = useSWR('payment-apps', async () => {
-    const { data, error } = await supabase
-      .from('user_payment_apps')
-      .select('*, payment_apps(*)')
-      .order('display_order');
-      
-    if (error) throw error;
-    return data;
+    const res = await fetch('/api/payment-apps');
+    if (!res.ok) throw new Error('Failed to fetch');
+    return res.json();
   });
   
   return {
@@ -258,6 +289,31 @@ export function usePaymentApps() {
 ```
 
 ## 5. ユーザーフロー（MVP）
+
+### ユーザージャーニー図
+
+```mermaid
+graph LR
+    A[アプリ初回アクセス] --> B{ログイン状態?}
+    B -->|未ログイン| C[ゲストモード/ログイン選択]
+    B -->|ログイン済み| E[ダッシュボード表示]
+    
+    C -->|ゲストモード| D[アプリ選択画面]
+    C -->|ログイン| Login[ログイン処理]
+    Login --> E
+    
+    D -->|選択完了| E
+    
+    E -->|PCの場合| F[QRコード表示]
+    E -->|モバイルの場合| G[タップでアプリ起動]
+    
+    F -->|スキャン| H[QR決済アプリ起動]
+    G --> H
+    
+    E -->|設定ボタン| I[設定画面]
+    I -->|アプリ追加/削除| J[設定保存]
+    J --> E
+```
 
 1. **アプリ初回アクセス**
    - Webブラウザでサイトにアクセス
@@ -481,3 +537,305 @@ return () => {
 Next.js + Supabaseを採用したWebアプリケーションアプローチにより、PCとモバイルの両方に対応した柔軟なQR決済アプリHubを実現できます。URLスキームを活用したディープリンク機能とPC向けのQRコード表示機能により、様々なデバイスからQR決済アプリへのシームレスな遷移が可能になります。
 
 MVPではWebブラウザからQR決済アプリへの起動機能に集中し、その後のフェーズで残高表示やキャンペーン情報など付加価値機能を順次実装していくことで、ユーザー体験を段階的に向上させることができます。
+
+## 16. MCP実装の詳細と現状
+
+### 実装アーキテクチャ
+
+MCPでは、設計書に記載した技術要素のほとんどを実装しましたが、いくつかの点で最新のトレンドを取り入れた進化も行っています：
+
+1. **Next.js App Router採用**
+   - Pages Routerではなく、App Routerを採用し、より最新のNext.js機能を活用
+   - Turbopackによる高速な開発体験
+   - Serverコンポーネントとクライアントコンポーネントの適切な使い分け
+
+2. **UI設計の拡張**
+   - 当初設計以上に洗練されたUIを実現 (shadcn/uiライブラリ導入)
+   - Radix UIをベースとした堅牢なコンポーネント
+   - ダークモード対応
+   - アニメーションとトランジション効果によるUX向上
+   - アクセシビリティ対応
+
+3. **デバイス最適化**
+   - デバイス検出の精緻化
+   - PCでのQRコード表示の実装
+   - アプリ未インストール時のストア遷移フォールバック
+
+### コンポーネント構成
+
+```
+app/
+├── components/            // 主要コンポーネント
+│   ├── Dashboard.tsx      // メインダッシュボード
+│   ├── PaymentAppCard.tsx // 決済アプリカード
+│   └── Layout.tsx         // 共通レイアウト
+├── hooks/                 // カスタムフック
+│   ├── useAuth.ts         // 認証処理
+│   └── usePaymentApps.ts  // 決済アプリデータ取得
+├── lib/                   // ユーティリティ
+│   ├── supabase.ts        // Supabase連携
+│   └── deepLink.ts        // アプリ起動関連
+├── api/                   // APIルートエンドポイント
+│   └── payment-apps/      // 決済アプリAPI
+├── types/                 // 型定義
+├── page.tsx               // ホームページ
+└── layout.tsx             // 基本レイアウト
+```
+
+### コンポーネント関係図
+
+```mermaid
+graph TD
+    RootLayout[app/layout.tsx] --> Page[app/page.tsx]
+    Page --> Layout[Layout.tsx]
+    Layout --> Dashboard[Dashboard.tsx]
+    
+    Dashboard --> PaymentAppCard[PaymentAppCard.tsx]
+    Dashboard --> usePaymentApps[usePaymentApps.ts]
+    Dashboard --> useAuth[useAuth.ts]
+    
+    PaymentAppCard --> deepLink[deepLink.ts]
+    PaymentAppCard --> QRCode[qrcode.react]
+    
+    usePaymentApps --> API[/api/payment-apps]
+    useAuth --> Supabase[supabase.ts]
+    API --> Supabase
+    
+    subgraph "UI Components"
+        PaymentAppCard --> Button[UI: Button]
+        PaymentAppCard --> Card[UI: Card]
+        PaymentAppCard --> Dialog[UI: Dialog]
+        Dashboard --> Tabs[UI: Tabs]
+        Dashboard --> Form[UI: Form]
+    end
+    
+    subgraph "State Management"
+        Dashboard --> useState1[React State]
+        PaymentAppCard --> useState2[React State]
+        usePaymentApps --> SWR[SWR]
+    end
+```
+
+### UIコンポーネントライブラリの活用
+
+shadcn/uiを採用した理由と利点：
+
+1. **再利用可能性**:
+   - コンポーネントの一貫性を保ちながら、プロジェクト固有のニーズに合わせてカスタマイズ可能
+   - コピー&ペーストモデルによる柔軟なコード管理
+
+2. **アクセシビリティ**:
+   - Radix UIをベースとしたアクセシビリティ対応
+   - キーボードナビゲーション、スクリーンリーダー対応、フォーカス管理などの実装
+
+3. **デザインシステムとの統合**:
+   - Tailwind CSSと完全に互換
+   - 一貫したデザイン言語の適用が容易
+
+4. **テーマ対応**:
+   - ダークモード/ライトモードの簡易な実装
+   - カラースキームのカスタマイズ
+
+主要なコンポーネント:
+- Card: 決済アプリの表示
+- Dialog: QRコード表示や設定画面
+- Form: ユーザー設定
+- Button: アクション要素
+- Tooltip: ヘルプテキスト
+
+### PaymentAppCardの実装詳細
+
+PaymentAppCardは、モバイル/PC両方のユースケースを処理する中核コンポーネントです。その主な機能は：
+
+1. **デバイス検出**:
+   - UAに基づいてモバイルかPCかを判定
+   - それぞれのデバイスに最適な表示とアクション
+
+2. **アプリ起動処理**:
+   - モバイル: URLスキームを使用して決済アプリを直接起動
+   - PC: QRコードを表示し、モバイルでのスキャンを促進
+
+3. **フォールバックメカニズム**:
+   - アプリが見つからない場合にアプリストアへの誘導
+   - visibilitychangeイベントを活用したアプリ起動検出
+
+```typescript
+// ユーザーのデバイスに応じたURLスキーム生成
+const getAppLink = (app: PaymentApp): string => {
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(userAgent);
+  const isAndroid = /android/.test(userAgent);
+  
+  if (isIOS && app.ios_url_scheme) {
+    return app.ios_url_scheme;
+  } else if (isAndroid && app.android_url_scheme) {
+    return app.android_url_scheme;
+  }
+  
+  return app.web_url;
+};
+
+// アプリを起動する関数
+const openPaymentApp = (app: PaymentApp): void => {
+  const appLink = getAppLink(app);
+  appLaunchState.lastAttemptedApp = app.id;
+  appLaunchState.timeAttempted = Date.now();
+  
+  // アプリが起動しなかった場合のフォールバック
+  const timeout = setTimeout(() => {
+    window.location.href = getStoreLink(app) || app.web_url;
+  }, 1000);
+  
+  // アプリへ遷移
+  window.location.href = appLink;
+  
+  // アプリが起動したらタイムアウトをクリア
+  window.addEventListener('pagehide', () => {
+    clearTimeout(timeout);
+  }, { once: true });
+};
+```
+
+### データフェッチングパターン
+
+MCPでは、以下のデータフェッチングパターンを実装しています：
+
+1. **カスタムフックを使用したデータ取得**:
+   ```typescript
+   export function useUserPaymentApps() {
+     const [userPaymentApps, setUserPaymentApps] = useState<UserPaymentApp[]>([]);
+     const [isLoading, setIsLoading] = useState(true);
+     const { user } = useAuth();
+     
+     // ユーザー設定の取得
+     useEffect(() => {
+       if (!user && localStorage.getItem('guestSelectedApps')) {
+         // ゲストモード時はローカルストレージから取得
+         fetchGuestApps();
+       } else if (user) {
+         // 認証ユーザーはAPIから取得
+         fetchUserApps(user.id);
+       } else {
+         setIsLoading(false);
+       }
+     }, [user]);
+     
+     // 更新関数
+     const updateUserPaymentApps = async (appIds: string[]) => {
+       // APIを通じてデータ更新
+     };
+     
+     return { userPaymentApps, isLoading, updateUserPaymentApps };
+   }
+   ```
+
+2. **APIルートを活用したサーバーサイド処理**:
+   ```typescript
+   // app/api/payment-apps/route.ts
+   export async function GET() {
+     const { data, error } = await supabase
+       .from('payment_apps')
+       .select('*')
+       .order('name');
+       
+     if (error) return NextResponse.json({ error }, { status: 500 });
+     return NextResponse.json(data);
+   }
+   
+   export async function POST(request: Request) {
+     const { user_id, app_ids } = await request.json();
+     
+     // Supabaseでデータ更新
+     // ...
+     
+     return NextResponse.json({ success: true });
+   }
+   ```
+
+### 拡張と改善点
+
+1. **現状の課題**:
+   - アプリの起動状態検出が100%正確ではない
+   - ゲストモードでの設定はローカルストレージのみ
+   - 複数デバイス間での設定同期に認証が必要
+
+2. **次フェーズでの改善案**:
+   - Universal Linksの採用によるより良いディープリンク
+   - IndexedDBを使用したオフラインストレージ
+   - PWA化によるホーム画面への追加サポート
+   - ソーシャルログインの追加
+
+3. **残高表示のためのAPI連携計画**:
+   - OAuth認証によるサードパーティアプリ連携
+   - 決済アプリが提供するAPIの活用
+   - セキュアな認証情報管理と定期更新
+
+### セキュリティ強化
+
+1. **現状の実装**:
+   - Supabase RLSによるデータ保護
+   - JWTベースの認証
+
+2. **強化予定項目**:
+   - CSP (Content Security Policy)の厳格化
+   - レート制限の実装
+   - セキュリティヘッダーの追加設定
+
+### 現在の主要な依存パッケージ
+
+```json
+{
+  "dependencies": {
+    "@hookform/resolvers": "^4.1.3",
+    "@radix-ui/react-avatar": "^1.1.3",
+    "@radix-ui/react-checkbox": "^1.1.4",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-dropdown-menu": "^2.1.6",
+    "@radix-ui/react-hover-card": "^1.1.6",
+    "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-select": "^2.1.6",
+    "@radix-ui/react-separator": "^1.1.2",
+    "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-switch": "^1.1.3",
+    "@radix-ui/react-tabs": "^1.1.3",
+    "@radix-ui/react-tooltip": "^1.1.8",
+    "@supabase/supabase-js": "^2.49.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.484.0",
+    "next": "15.2.4",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "sonner": "^2.0.2",
+    "swr": "^2.3.3",
+    "tailwind-merge": "^3.0.2",
+    "tw-animate-css": "^1.2.4",
+    "zod": "^3.24.2"
+  }
+}
+```
+
+主な技術的特徴：
+
+1. **最新のReact 19**
+   - サーバーコンポーネントとクライアントコンポーネントの明示的な分離
+   - 最適なレンダリング戦略
+
+2. **Radixベースのコンポーネント**
+   - アクセシビリティを考慮したUI
+   - shadcn/uiによる一貫したデザインシステム
+
+3. **フォーム処理の強化**
+   - react-hook-formによる効率的なフォーム管理
+   - zodによるバリデーション
+
+4. **通知システム**
+   - sonnerによるモダンなトースト通知
+
+5. **データ取得**
+   - SWRによるキャッシュとリアルタイム更新
+   - Supabase SDKによるデータベース操作
+
+MCPは設計書に記載された要件のほとんどを満たしており、基本的な機能は安定して動作していますが、上記の拡張と改善を加えることで、さらに完成度の高いプロダクトへと進化させていく予定です。
