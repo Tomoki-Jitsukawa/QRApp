@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Layout from '../components/Layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllPaymentApps, useUserPaymentApps } from '../hooks/usePaymentApps';
+import { PaymentApp } from '../types';
 
 export default function Settings() {
   const { user, loading } = useAuth();
@@ -85,7 +86,7 @@ export default function Settings() {
           <p className="text-gray-600 dark:text-gray-300 mb-6">ダッシュボードに表示するQR決済アプリを選択してください。</p>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {paymentApps.map(app => (
+            {paymentApps.map((app: PaymentApp) => (
               <div
                 key={app.id}
                 className={`p-4 border rounded-lg cursor-pointer transition-colors duration-200 ${
