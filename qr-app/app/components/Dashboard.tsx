@@ -408,9 +408,9 @@ function PaymentAppCardAppleStyle({ app }: { app: PaymentApp }) {
           )}
           <div className="flex flex-col items-start">
             <span className="font-medium group-hover:text-primary transition-colors">{app.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {isPC ? "クリックして公式サイトを開く" : "タップして開く"}
-            </span>
+            {app.api_available && (
+              <span className="text-xs text-green-600 dark:text-green-400">API連携可能</span>
+            )}
           </div>
         </div>
         
