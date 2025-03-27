@@ -4,6 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Menu, LogOut, Settings, User, ChevronDown, Home } from 'lucide-react';
+import { Toaster } from 'sonner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,126 +24,163 @@ export default function Layout({ children }: LayoutProps) {
   // 認証関連ページの場合は簡易レイアウト
   if (pathname?.startsWith('/auth/')) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-all duration-300">
+      <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-800">
+          <h2 className="text-center text-3xl font-bold text-foreground">
             QR決済アプリHub
           </h2>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            あなた専用のQRコード決済プラットフォーム
+          </p>
         </div>
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 shadow-md sm:rounded-lg sm:px-10 transition-all duration-300 border border-gray-100">
-            {children}
-          </div>
+          <Card className="backdrop-blur-sm">
+            <CardContent className="pt-6">
+              {children}
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 transition-all duration-300">
-      <nav className="bg-white shadow-sm transition-all duration-300 sticky top-0 z-50 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <Link href="/" className="text-xl font-bold text-gray-800 transition-all duration-300 hover:text-blue-600">
-                  QR決済アプリHub
+    <div className="min-h-screen flex flex-col bg-background">
+      <Toaster position="top-center" richColors />
+      
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex gap-6 md:gap-10">
+              <Link href="/" className="flex items-center space-x-2">
+                <span className="inline-block font-bold text-xl">QR決済アプリHub</span>
+              </Link>
+              
+              <nav className="hidden md:flex gap-6">
+                <Link
+                  href="/"
+                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                    pathname === '/' ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  ホーム
                 </Link>
-              </div>
+                {!loading && user && (
+                  <Link
+                    href="/settings"
+                    className={`text-sm font-medium transition-colors hover:text-primary ${
+                      pathname === '/settings' ? 'text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    設定
+                  </Link>
+                )}
+              </nav>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
+            
+            <div className="hidden md:flex items-center gap-2">
               {!loading && (
                 <>
                   {user ? (
-                    <>
-                      <Link 
-                        href="/settings" 
-                        className="px-3 py-2 rounded-md text-gray-500 hover:text-blue-500 hover:bg-gray-100 transition-all duration-200 font-medium"
-                      >
-                        設定
-                      </Link>
-                      <button
-                        onClick={() => signOut()}
-                        className="px-3 py-2 rounded-md text-gray-500 hover:text-blue-500 hover:bg-gray-100 transition-all duration-200 font-medium"
-                      >
-                        ログアウト
-                      </button>
-                    </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="gap-1 h-8">
+                          <User className="h-4 w-4" />
+                          <span className="hidden sm:inline-block">アカウント</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href="/settings" className="flex items-center cursor-pointer gap-2">
+                            <Settings className="h-4 w-4" />
+                            <span>設定</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <Separator className="my-1" />
+                        <DropdownMenuItem onClick={() => signOut()} className="flex items-center cursor-pointer gap-2 text-red-500 focus:text-red-500">
+                          <LogOut className="h-4 w-4" />
+                          <span>ログアウト</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   ) : (
-                    <Link 
-                      href="/auth/login" 
-                      className="px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-all duration-200 shadow-sm hover:shadow-md font-medium"
-                    >
-                      ログイン
-                    </Link>
+                    <Button size="sm" asChild>
+                      <Link href="/auth/login">ログイン</Link>
+                    </Button>
                   )}
                 </>
               )}
             </div>
-            <div className="-mr-2 flex items-center sm:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-blue-500 hover:bg-gray-100 focus:outline-none transition-all duration-200"
-                aria-expanded={isMenuOpen}
-              >
-                <span className="sr-only">メニューを開く</span>
-                <svg className={`${isMenuOpen ? 'hidden' : 'block'} h-6 w-6`} stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-                <svg className={`${isMenuOpen ? 'block' : 'hidden'} h-6 w-6`} stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            
+            <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">メニューを開く</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left">
+                <div className="grid gap-6 py-6">
+                  <div className="space-y-3">
+                    <Link 
+                      href="/"
+                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Home className="h-4 w-4" />
+                      ホーム
+                    </Link>
+                    {!loading && user && (
+                      <Link 
+                        href="/settings"
+                        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        設定
+                      </Link>
+                    )}
+                    {!loading && (
+                      <>
+                        {user ? (
+                          <button
+                            onClick={() => {
+                              signOut();
+                              setIsMenuOpen(false);
+                            }}
+                            className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-600 transition-colors"
+                          >
+                            <LogOut className="h-4 w-4" />
+                            ログアウト
+                          </button>
+                        ) : (
+                          <Link 
+                            href="/auth/login"
+                            className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <User className="h-4 w-4" />
+                            ログイン
+                          </Link>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-        
-        {/* モバイルメニュー */}
-        <div 
-          className={`${isMenuOpen ? 'block' : 'hidden'} sm:hidden transform transition-all duration-300 ease-in-out ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}
-        >
-          <div className="pt-2 pb-3 space-y-1 bg-white border-b border-gray-100">
-            {!loading && user ? (
-              <>
-                <Link
-                  href="/settings"
-                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-blue-500 hover:bg-gray-50 hover:border-blue-500 transition-all duration-200"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  設定
-                </Link>
-                <button
-                  onClick={() => {
-                    signOut();
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-blue-500 hover:bg-gray-50 hover:border-blue-500 transition-all duration-200"
-                >
-                  ログアウト
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/auth/login"
-                className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-blue-500 hover:bg-gray-50 hover:border-blue-500 transition-all duration-200"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                ログイン
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
+      </header>
       
-      <main className="py-6 sm:py-10 lg:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {children}
-        </div>
+      <main className="flex-1 py-6 sm:py-10 container">
+        {children}
       </main>
       
-      <footer className="bg-white shadow-inner transition-all duration-300 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500">
+      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container py-6 text-center">
+          <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} QR決済アプリHub. All rights reserved.
           </p>
         </div>
