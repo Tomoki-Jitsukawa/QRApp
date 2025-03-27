@@ -192,7 +192,7 @@ export default function Dashboard() {
             <Button
               onClick={confirmSelection}
               disabled={selectedApps.length === 0 || isSaving}
-              className="relative overflow-hidden group"
+              className="relative"
             >
               {isSaving ? (
                 <span className="flex items-center gap-2">
@@ -203,12 +203,10 @@ export default function Dashboard() {
                   保存中...
                 </span>
               ) : (
-                <>
-                  <span className="group-hover:translate-y-[-100%] inline-block transition-transform duration-300">選択を確定</span>
-                  <span className="absolute top-0 left-0 w-full text-center translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300">
-                    決定 <CheckCircle className="h-4 w-4 inline-block" />
-                  </span>
-                </>
+                <span className="flex items-center gap-1">
+                  選択を確定
+                  <CheckCircle className="h-4 w-4 ml-1" />
+                </span>
               )}
             </Button>
           </CardFooter>
@@ -294,7 +292,12 @@ export default function Dashboard() {
                     </svg>
                     保存中...
                   </span>
-                ) : '保存'}
+                ) : (
+                  <span className="flex items-center gap-1">
+                    保存
+                    <CheckCircle className="h-4 w-4 ml-1" />
+                  </span>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -408,15 +411,27 @@ function PaymentAppCardAppleStyle({ app }: { app: PaymentApp }) {
           )}
           <div className="flex flex-col items-start">
             <span className="font-medium group-hover:text-primary transition-colors">{app.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {isPC ? "クリックして公式サイトを開く" : "タップして開く"}
+            </span>
             {app.api_available && (
               <span className="text-xs text-green-600 dark:text-green-400">API連携可能</span>
             )}
           </div>
         </div>
         
-        <div className={`${brandColors.bg} text-white rounded-full w-14 h-7 flex items-center justify-center text-xs font-medium group-hover:scale-105 transition-all group-hover:shadow-md shadow-sm`}>
-          開く
-        </div>
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" 
+          viewBox="0 0 20 20" 
+          fill="currentColor"
+        >
+          <path 
+            fillRule="evenodd" 
+            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" 
+            clipRule="evenodd" 
+          />
+        </svg>
       </Button>
     </div>
   );
