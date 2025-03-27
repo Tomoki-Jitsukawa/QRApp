@@ -597,7 +597,7 @@ graph TD
     PaymentAppCard --> deepLink[deepLink.ts]
     PaymentAppCard --> QRCode[qrcode.react]
     
-    usePaymentApps --> API[/api/payment-apps]
+    usePaymentApps --> API("/api/payment-apps")
     useAuth --> Supabase[supabase.ts]
     API --> Supabase
     
