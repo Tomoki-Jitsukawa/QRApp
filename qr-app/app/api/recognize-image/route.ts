@@ -11,7 +11,7 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY || "YOUR_API_KEY_MISSING"); // Fallback only for type checking, will fail if key is truly missing
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-pro-vision",
+  model: "gemini-1.5-flash-latest",
 });
 
 const generationConfig = {

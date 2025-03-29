@@ -26,50 +26,41 @@ export function SortableItem({ id, item, isOverlay }: SortableItemProps) {
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: transition || undefined,
-    // padding や marginBottom は className で制御するため削除 or コメントアウト
-    zIndex: isDragging || isOverlay ? 10 : undefined, // ドラッグ中は手前に表示
+    zIndex: isDragging || isOverlay ? 10 : undefined,
     opacity: isDragging ? 0.5 : undefined,
-    // cursor はハンドルに設定するため削除 or コメントアウト
   };
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      // ドラッグハンドルにリスナーを移動したため削除
-      // {...attributes}
-      // {...listeners}
-      className={`flex items-center p-2 mb-2 touch-none ${isDragging ? 'shadow-lg' : ''} ${isOverlay ? 'ring-2 ring-primary' : ''} w-full`} // w-full を追加し、padding (p-2) を調整
+      className={`flex items-center py-1 px-2 mb-1 touch-none ${isDragging ? 'shadow-lg' : ''} ${isOverlay ? 'ring-2 ring-primary' : ''} w-full`}
     >
       {/* ドラッグハンドル */}
       <Button
         variant="ghost"
         size="sm"
-        {...attributes} // ドラッグハンドルにリスナーと属性を設定
+        {...attributes}
         {...listeners}
-        className="cursor-grab mr-2 px-2 flex-shrink-0" // 右マージン、padding調整、縮まないように設定
+        className="cursor-grab px-1 mr-1 flex-shrink-0"
         aria-label="Drag handle"
       >
-        <GripVertical className="h-5 w-5" />
+        <GripVertical className="h-4 w-4" />
       </Button>
       {/* ロゴ */}
-      <div className="flex-shrink-0 w-8 h-8 mr-3 relative"> {/* ロゴのコンテナ、右マージン追加、サイズ指定 */}
+      <div className="flex-shrink-0 w-6 h-6 mr-2 relative">
         {item.payment_app?.logo_url && (
           <Image
             src={item.payment_app.logo_url}
             alt={`${item.payment_app?.name || 'App'} logo`}
             layout="fill"
             objectFit="contain"
-            unoptimized // 必要に応じて unoptimized を追加 (外部URLの場合など)
+            unoptimized
           />
         )}
       </div>
       {/* アプリ名 */}
-      <span className="flex-grow text-sm mr-2">{item.payment_app?.name || 'Unknown App'}</span> {/* Optional chaining と fallback を使用 */}
-      {/* 優先度 (表示不要なら削除) */}
-      {/* <span className="text-xs text-muted-foreground ml-auto">
-        Priority: {item.priority ?? 'N/A'}
-      </span> */}
+      <span className="flex-grow text-sm truncate">{item.payment_app?.name || 'Unknown App'}</span>
     </Card>
   );
 } 

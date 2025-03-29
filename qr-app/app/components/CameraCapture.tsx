@@ -86,8 +86,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, isProcessing, 
   }, [stream, onCapture, onError, isProcessing]); // isProcessing を依存に追加
 
   return (
-    <div className="flex flex-col items-center space-y-4 w-full">
-      <div className="relative w-full max-w-md border rounded-md overflow-hidden max-h-[60vh]">
+    <div className="flex flex-col items-center space-y-4 w-full max-h-[70vh]">
+      <div className="relative w-full max-w-md border rounded-md overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
@@ -111,7 +111,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, isProcessing, 
       </div>
       <canvas ref={canvasRef} style={{ display: 'none' }} /> {/* 描画用、非表示 */}
 
-      <div className="flex space-x-4">
+      <div className="flex space-x-4 flex-shrink-0">
         <Button onClick={handleCaptureClick} disabled={!stream || isProcessing} size="lg">
           <Camera className="mr-2 h-5 w-5" />
           {isProcessing ? '認識中...' : '撮影して認識'}
