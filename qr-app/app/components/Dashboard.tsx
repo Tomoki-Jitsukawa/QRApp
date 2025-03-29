@@ -195,17 +195,39 @@ export default function Dashboard() {
   // --- Updated appsToDisplay to use priority and useMemo --- END ---
 
   // --- Camera Feature Callbacks --- START ---
-  const handleCapture = useCallback((imageDataUrl: string) => {
-    console.log('Image captured');
+  const handleCapture = useCallback(async (imageDataUrl: string) => {
+    console.log('Image captured, calling API...');
     setCapturedImage(imageDataUrl);
     setIdentifiedServices([]);
     setCameraError('');
     setIsRecognizing(true);
-    setTimeout(() => {
-        handleResult(['PayPay', 'LINE Pay']);
-    }, 2000);
 
-  }, []);
+    try {
+      const response = await fetch('/api/recognize-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageDataUrl }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("API response received:", result);
+      handleResult(result.services || []);
+
+    } catch (error) {
+      console.error("Failed to call recognition API:", error);
+      handleError(error instanceof Error ? error.message : "Unknown error occurred during recognition.");
+    }
+
+    // <<< Remove dependencies and add eslint disable comment >>>
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependencies removed: handleResult, handleError
 
   const handleResult = useCallback((services: string[]) => {
     console.log('[handleResult] Received services:', services);
@@ -248,7 +270,7 @@ export default function Dashboard() {
     setCameraError(message);
     setIdentifiedServices([]);
     setIsRecognizing(false);
-    toast.error(`エラー: ${message}`);
+    toast.error(`認識エラー: ${message}`);
   }, []);
   // --- Camera Feature Callbacks --- END ---
 
@@ -346,7 +368,7 @@ export default function Dashboard() {
                       お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4 space-y-4">
+                  <div className="py-4 space-y-4 max-h-[80vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={handleCapture}
                       onResult={handleResult}
@@ -484,7 +506,7 @@ export default function Dashboard() {
           <CardContent>
             {(() => {
               console.log(`[Render Identified Services] isRecognizing: ${isRecognizing}, cameraError: ${cameraError}, services.length: ${identifiedServices.length}`);
-              return null; // Return null to prevent rendering issues
+              return null;
             })()}
             {isRecognizing ? (
               <div className="flex items-center justify-center py-4 text-muted-foreground">

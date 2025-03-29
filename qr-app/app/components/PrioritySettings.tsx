@@ -40,46 +40,46 @@ function SortableItem({ item }: SortableItemProps) {
     setNodeRef,
     transform,
     transition,
-    isDragging, // Added to style while dragging
+    isDragging,
   } = useSortable({ id: item.dndId });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined, // Ensure dragging item is on top
-    opacity: isDragging ? 0.8 : 1,      // Slightly transparent when dragging
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.8 : 1,
   };
 
   return (
     <Card
         ref={setNodeRef}
         style={style}
-        className={`mb-2 p-3 flex items-center bg-background shadow-sm border ${isDragging ? 'shadow-lg border-primary' : ''}`}
+        className={`mb-2 p-2 flex items-center bg-background shadow-sm border ${isDragging ? 'shadow-lg border-primary' : ''}`}
     >
         <button
             {...attributes}
             {...listeners}
-            className="cursor-grab touch-none mr-3 text-muted-foreground hover:text-foreground"
+            className="cursor-grab touch-none mr-2 p-1 text-muted-foreground hover:text-foreground"
             aria-label={`並び替えハンドル ${item.name}`}
         >
-            <GripVertical size={20} />
+            <GripVertical size={18} />
         </button>
-        <div className="flex-shrink-0 mr-3">
+        <div className="flex-shrink-0 mr-2">
          {item.logo_url ? (
             <Image
              src={item.logo_url}
              alt={item.name}
-             width={32}
-             height={32}
-             className="rounded-md object-contain"
+             width={24}
+             height={24}
+             className="rounded-sm object-contain"
             />
           ) : (
-            <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center">
-              <span className="text-muted-foreground font-bold text-sm">{item.name.charAt(0)}</span>
+            <div className="w-6 h-6 bg-muted rounded-sm flex items-center justify-center">
+              <span className="text-muted-foreground font-semibold text-xs">{item.name.charAt(0)}</span>
             </div>
           )}
         </div>
-        <span className="text-sm font-medium">{item.name}</span>
+        <span className="text-sm font-medium truncate">{item.name}</span>
     </Card>
   );
 }
