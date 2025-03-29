@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../hooks/useAuth';
@@ -46,17 +46,143 @@ export default function Dashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [showAppSelector, setShowAppSelector] = useState(false);
-
-  // State for the ordered list of app IDs for priority setting
   const [orderedAppIds, setOrderedAppIds] = useState<string[]>([]);
-
-  // --- Camera Feature State ---
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [identifiedServices, setIdentifiedServices] = useState<string[]>([]);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [cameraError, setCameraError] = useState<string>('');
-  // --- End Camera Feature State ---
+
+  // --- 1. appsToDisplay を定義 ---
+  const appsToDisplay = useMemo(() => {
+    // console.log('[appsToDisplay useMemo] Calculating...', { isLoggedIn: !!user, isUserAppsLoading, userPaymentAppsCount: userPaymentApps?.length, selectedAppsCount: selectedApps.length, paymentAppsCount: paymentApps?.length });
+    if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
+      // console.log('[appsToDisplay useMemo] Using userPaymentApps (sorted)');
+      return [...userPaymentApps]
+          .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+          .map(userApp => userApp.payment_app!)
+          .filter((app): app is PaymentApp => !!app);
+     }
+     else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
+        // console.log('[appsToDisplay useMemo] Using selectedApps (guest mode)');
+        const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
+        return selectedApps
+            .map(id => appMap.get(id))
+            .filter((app): app is PaymentApp => !!app);
+     }
+     else {
+      //  console.log('[appsToDisplay useMemo] Returning empty array.');
+       return [];
+     }
+   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
+
+  // --- 2. handleResult を定義 (appsToDisplay に依存) ---
+  const handleResult = useCallback((services: string[]) => {
+    console.log('[handleResult] Received services from API:', services);
+    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(app => ({ name: app.name, id: app.id })));
+    setIdentifiedServices(services);
+    setIsRecognizing(false);
+    setCameraError('');
+
+    if (services.length > 0) {
+        toast.success(`${services.join(', ')} が見つかりました。`);
+        const userApps = appsToDisplay; // この時点での最新の appsToDisplay を使う
+        let appToLaunch: PaymentApp | null = null;
+        let foundMatch = false;
+
+        for (const app of userApps) {
+           console.log(`[handleResult] Comparing service names with app: name='${app.name}' (length: ${app.name?.length})`);
+           const isMatch = services.some(service => {
+               const serviceLower = service?.toLowerCase() || '';
+               const appNameLower = app.name?.toLowerCase() || '';
+               console.log(`  Comparing: '${serviceLower}' (len:${serviceLower.length}) === '${appNameLower}' (len:${appNameLower.length}) -> ${serviceLower === appNameLower}`);
+               if (serviceLower.includes('paypay') || appNameLower.includes('paypay')) {
+                  console.log(`    (PayPay comparison check: service='${service}', app.name='${app.name}')`);
+               }
+               return serviceLower === appNameLower;
+           });
+           if (isMatch) {
+               appToLaunch = app;
+               foundMatch = true;
+               console.log(`[handleResult] Match found! App to launch: ${app.name} (Priority highest)`);
+               break;
+           }
+        }
+        if (appToLaunch) {
+            console.log(`[handleResult] Attempting to call openPaymentApp for: ${appToLaunch.name}`);
+            toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
+            openPaymentApp(appToLaunch);
+        } else {
+            if (!foundMatch) {
+               console.log('[handleResult] No matching app found in appsToDisplay for the identified services.');
+               console.log('  Recognized services:', services);
+               console.log('  Available apps:', appsToDisplay.map(a => a.name));
+            } else {
+               console.warn('[handleResult] Logic error: Match found but appToLaunch is null.');
+            }
+            toast.info('利用可能な登録済みアプリが見つかりませんでした。');
+        }
+    } else {
+        console.log('[handleResult] No services identified by API.');
+    }
+  }, [appsToDisplay, openPaymentApp]); // openPaymentApp が安定なら外しても良い
+
+  // --- 3. handleError を定義 ---
+  const handleError = useCallback((message: string) => {
+    console.error('Camera/API Error:', message);
+    setCameraError(message);
+    setIdentifiedServices([]);
+    setIsRecognizing(false);
+    toast.error(`認識エラー: ${message}`);
+  }, []);
+
+  // --- 4. & 5. Ref を初期値 null で作成 ---
+  const handleResultRef = useRef<((services: string[]) => void) | null>(null);
+  const handleErrorRef = useRef<((message: string) => void) | null>(null);
+
+  // --- 6. & 7. useEffect で Ref を更新 ---
+  useEffect(() => {
+    handleResultRef.current = handleResult;
+  }, [handleResult]);
+
+  useEffect(() => {
+    handleErrorRef.current = handleError;
+  }, [handleError]);
+
+  // --- 8. handleCapture を定義 (依存配列 []) ---
+  const handleCapture = useCallback(async (imageDataUrl: string) => {
+    console.log('Image captured, calling API...');
+    setCapturedImage(imageDataUrl);
+    setIdentifiedServices([]);
+    setCameraError('');
+    setIsRecognizing(true);
+
+    try {
+      const response = await fetch('/api/recognize-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageDataUrl }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("API response received:", result);
+      // Ref を介して呼び出す (Optional Chaining を使用)
+      handleResultRef.current?.(result.services || []);
+
+    } catch (error) {
+      console.error("Failed to call recognition API:", error);
+      // Ref を介して呼び出す (Optional Chaining を使用)
+      handleErrorRef.current?.(error instanceof Error ? error.message : "Unknown error occurred during recognition.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 依存配列は空
 
   // <<< Modify useEffect to ONLY set initial order based on userPaymentApps >>>
   useEffect(() => {
@@ -172,145 +298,6 @@ export default function Dashboard() {
     }
   };
   // --- Updated confirmSelection to include order --- END ---
-
-
-  // --- Updated appsToDisplay to use priority and useMemo --- START ---
-  const appsToDisplay = useMemo(() => {
-    // <<< Add logs here >>>
-    console.log('[appsToDisplay useMemo] Calculating...', {
-        isLoggedIn: !!user,
-        isUserAppsLoading,
-        userPaymentAppsLength: userPaymentApps?.length ?? 0,
-        selectedAppsLength: selectedApps.length,
-        paymentAppsLength: paymentApps?.length ?? 0,
-    });
-
-    // ログインユーザーの場合
-    if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
-      console.log('[appsToDisplay useMemo] Using userPaymentApps (sorted)');
-      // Sort user's apps based on the priority field
-      return [...userPaymentApps] // Create a mutable copy
-          .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
-          .map(userApp => userApp.payment_app!) // Map to PaymentApp details
-          .filter((app): app is PaymentApp => !!app); // Type guard
-     }
-     // ゲストモード (または初期選択後) の場合
-     else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
-        console.log('[appsToDisplay useMemo] Using selectedApps (guest mode)');
-        const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
-        return selectedApps
-            .map(id => appMap.get(id))
-            .filter((app): app is PaymentApp => !!app);
-     }
-     // 上記以外の場合 (アプリデータがない、読み込み中など)
-     else {
-       console.log('[appsToDisplay useMemo] Returning empty array.');
-       return [];
-     }
-   // <<< Dependencies should be correct >>>
-   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
-  // --- Updated appsToDisplay to use priority and useMemo --- END ---
-
-  // --- Camera Feature Callbacks --- START ---
-  const handleCapture = useCallback(async (imageDataUrl: string) => {
-    console.log('Image captured, calling API...');
-    setCapturedImage(imageDataUrl);
-    setIdentifiedServices([]);
-    setCameraError('');
-    setIsRecognizing(true);
-
-    try {
-      const response = await fetch('/api/recognize-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ imageDataUrl }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API Error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("API response received:", result);
-      handleResult(result.services || []);
-
-    } catch (error) {
-      console.error("Failed to call recognition API:", error);
-      handleError(error instanceof Error ? error.message : "Unknown error occurred during recognition.");
-    }
-
-    // <<< Remove dependencies and add eslint disable comment >>>
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Dependencies removed: handleResult, handleError
-
-  const handleResult = useCallback((services: string[]) => {
-    console.log('[handleResult] Received services from API:', services);
-    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(app => ({ name: app.name, id: app.id })));
-    setIdentifiedServices(services);
-    setIsRecognizing(false);
-    setCameraError('');
-
-    if (services.length > 0) {
-        toast.success(`${services.join(', ')} が見つかりました。`);
-
-        const userApps = appsToDisplay;
-        let appToLaunch: PaymentApp | null = null;
-        let foundMatch = false;
-
-        for (const app of userApps) {
-           console.log(`[handleResult] Comparing service names with app: name='${app.name}' (length: ${app.name?.length})`); // アプリ名を詳細にログ出力
-           const isMatch = services.some(service => {
-               // 比較する両方の文字列と長さをログ出力
-               const serviceLower = service?.toLowerCase() || ''; // null/undefined対策
-               const appNameLower = app.name?.toLowerCase() || ''; // null/undefined対策
-               console.log(`  Comparing: '${serviceLower}' (len:${serviceLower.length}) === '${appNameLower}' (len:${appNameLower.length}) -> ${serviceLower === appNameLower}`);
-               // 特に "PayPay" の比較を注目
-               if (serviceLower.includes('paypay') || appNameLower.includes('paypay')) {
-                  console.log(`    (PayPay comparison check: service='${service}', app.name='${app.name}')`);
-               }
-               return serviceLower === appNameLower;
-           });
-
-           if (isMatch) {
-               appToLaunch = app;
-               foundMatch = true;
-               console.log(`[handleResult] Match found! App to launch: ${app.name} (Priority highest)`);
-               break;
-           }
-        }
-
-        if (appToLaunch) {
-            console.log(`[handleResult] Attempting to call openPaymentApp for: ${appToLaunch.name}`);
-            toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
-            openPaymentApp(appToLaunch);
-        } else {
-            if (!foundMatch) {
-               console.log('[handleResult] No matching app found in appsToDisplay for the identified services.');
-               // 認識されたサービスと登録アプリ名を再度リストアップ
-               console.log('  Recognized services:', services);
-               console.log('  Available apps:', appsToDisplay.map(a => a.name));
-            } else {
-               console.warn('[handleResult] Logic error: Match found but appToLaunch is null.');
-            }
-            toast.info('利用可能な登録済みアプリが見つかりませんでした。');
-        }
-
-    } else {
-        console.log('[handleResult] No services identified by API.');
-    }
-  }, [appsToDisplay, openPaymentApp]);
-
-  const handleError = useCallback((message: string) => {
-    console.error('Camera/API Error:', message);
-    setCameraError(message);
-    setIdentifiedServices([]);
-    setIsRecognizing(false);
-    toast.error(`認識エラー: ${message}`);
-  }, []);
-  // --- Camera Feature Callbacks --- END ---
 
 
   // --- Loading state --- START ---
