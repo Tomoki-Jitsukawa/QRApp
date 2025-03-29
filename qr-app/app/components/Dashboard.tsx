@@ -55,26 +55,36 @@ export default function Dashboard() {
 
   // --- 1. appsToDisplay を定義 ---
   const appsToDisplay = useMemo(() => {
-    // console.log('[appsToDisplay useMemo] Calculating...', { isLoggedIn: !!user, isUserAppsLoading, userPaymentAppsCount: userPaymentApps?.length, selectedAppsCount: selectedApps.length, paymentAppsCount: paymentApps?.length });
+    // ★ログ復活・詳細化
+    console.log('[appsToDisplay useMemo] Calculating...', {
+        isLoggedIn: !!user,
+        isUserAppsLoading,
+        userPaymentAppsCount: userPaymentApps?.length ?? 'N/A', // null も考慮
+        selectedApps, // selectedApps の内容自体をログ出力
+        paymentAppsCount: paymentApps?.length ?? 'N/A' // null も考慮
+    });
     if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
-      // console.log('[appsToDisplay useMemo] Using userPaymentApps (sorted)');
+      console.log('[appsToDisplay useMemo] Using userPaymentApps (sorted)');
       return [...userPaymentApps]
           .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
           .map(userApp => userApp.payment_app!)
           .filter((app): app is PaymentApp => !!app);
      }
      else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
-        // console.log('[appsToDisplay useMemo] Using selectedApps (guest mode)');
+        console.log('[appsToDisplay useMemo] Using selectedApps (guest mode)');
         const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
-        return selectedApps
+        const guestApps = selectedApps
             .map(id => appMap.get(id))
             .filter((app): app is PaymentApp => !!app);
+        // ★ログ追加: ゲストモードで計算されたアプリリスト
+        console.log('[appsToDisplay useMemo] Calculated guest apps:', guestApps.map(a => a.name));
+        return guestApps;
      }
      else {
-      //  console.log('[appsToDisplay useMemo] Returning empty array.');
+       console.log('[appsToDisplay useMemo] Returning empty array. Conditions not met.');
        return [];
      }
-   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
+   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]); // 依存配列は変更なし
 
   // --- 2. handleResult を定義 (appsToDisplay に依存) ---
   const handleResult = useCallback((services: string[]) => {
@@ -224,8 +234,9 @@ export default function Dashboard() {
       if (savedApps) {
         // Make sure selectedApps state reflects guest data
         const parsedGuestApps = JSON.parse(savedApps);
+        // Compare before setting to avoid unnecessary re-renders/loops
         if (JSON.stringify(parsedGuestApps) !== JSON.stringify(selectedApps)) {
-           setSelectedApps(parsedGuestApps);
+           setSelectedApps(parsedGuestApps); // This updates the state based on localStorage
         }
       }
     }
@@ -239,7 +250,8 @@ export default function Dashboard() {
        // Hide selector once apps are loaded for logged-in user
        setShowAppSelector(false);
     }
-  }, [loading, user, userPaymentApps, isUserAppsLoading, selectedApps]);
+  // ★依存配列から selectedApps を削除
+  }, [loading, user, userPaymentApps, isUserAppsLoading]);
   // --- Existing useEffect for showAppSelector --- END ---
 
 
@@ -271,25 +283,41 @@ export default function Dashboard() {
   const confirmSelection = async () => {
     setIsSaving(true);
     // Get the final ordered list based on the current selection
+    // ★ログ追加: 保存直前の selectedApps と orderedAppIds
+    console.log('[confirmSelection] Starting save...', { currentSelectedApps: selectedApps, currentOrderedAppIds: orderedAppIds });
+
     const finalOrderedSelection = orderedAppIds.filter(id => selectedApps.includes(id));
+    // ★ログ追加: 最終的に保存するIDリスト
+    console.log('[confirmSelection] Final ordered selection to save:', finalOrderedSelection);
 
     // For guest users, save to local storage and update state
     if (!user) {
+        // ★ログ追加: ゲストモードでの保存
+        console.log('[confirmSelection] Saving for GUEST user.');
         localStorage.setItem('guestSelectedApps', JSON.stringify(finalOrderedSelection));
-        setSelectedApps(finalOrderedSelection);
+        setSelectedApps(finalOrderedSelection); // ★重要: ステートを直接更新
         setShowAppSelector(false);
         toast.success('設定を保存しました (ゲスト)');
         setIsSettingsDialogOpen(false);
         setIsSaving(false);
+        // ★ログ追加: ゲストモード保存完了後の selectedApps
+        console.log('[confirmSelection] GUEST save complete. New selectedApps state should be:', finalOrderedSelection);
         return; // Exit for guest user
     }
 
     // For logged-in users, update via the hook
     try {
+      // ★ログ追加: ログインユーザーでの保存
+      console.log('[confirmSelection] Saving for LOGGED IN user.');
       await updateUserPaymentApps(finalOrderedSelection);
+      // Note: updateUserPaymentApps should trigger a re-fetch of userPaymentApps,
+      // which will then update appsToDisplay via the useMemo dependency.
+      // We might not need to call setSelectedApps directly here if useUserPaymentApps handles it.
       setShowAppSelector(false); // Hide selector if it was shown
       toast.success('決済アプリの設定を保存しました');
       setIsSettingsDialogOpen(false); // Close the settings dialog
+       // ★ログ追加: ログインユーザー保存 API 呼び出し完了
+       console.log('[confirmSelection] LOGGED IN save API call complete.');
     } catch (error) {
       console.error('Error saving app selection:', error);
       toast.error('設定の保存に失敗しました。');
