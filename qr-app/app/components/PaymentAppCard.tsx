@@ -15,9 +15,10 @@ import { X } from 'lucide-react';
 interface PaymentAppCardProps {
   app: PaymentApp;
   isHighlighted?: boolean;
+  onAppClick: () => void;
 }
 
-export default function PaymentAppCard({ app, isHighlighted = false }: PaymentAppCardProps) {
+export default function PaymentAppCard({ app, isHighlighted = false, onAppClick }: PaymentAppCardProps) {
   const [showQr, setShowQr] = useState(false);
   const [showStoreOption, setShowStoreOption] = useState(false);
   const [appLaunched, setAppLaunched] = useState(false);
@@ -58,9 +59,7 @@ export default function PaymentAppCard({ app, isHighlighted = false }: PaymentAp
       // 状態をリセット
       setShowStoreOption(false);
       setAppLaunched(false);
-      
-      // アプリを開く
-      openPaymentApp(app);
+      onAppClick();
     }
   };
   

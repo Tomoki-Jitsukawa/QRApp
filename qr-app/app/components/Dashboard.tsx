@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle, CirclePlus, CreditCard, Settings, Camera } from 'lucide-react';
+import { CheckCircle, CirclePlus, CreditCard, Settings, Camera, Loader2 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { XCircle, ScanEye } from 'lucide-react';
@@ -54,37 +54,32 @@ export default function Dashboard() {
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [identifiedServices, setIdentifiedServices] = useState<string[]>([]);
+  const [isRecognizing, setIsRecognizing] = useState(false);
   const [cameraError, setCameraError] = useState<string>('');
   // --- End Camera Feature State ---
 
-  // Initialize or update orderedAppIds when selectedApps or userPaymentApps change
+  // <<< Modify useEffect to ONLY set initial order based on userPaymentApps >>>
   useEffect(() => {
-    const currentSelectedAppDetails = (paymentApps || [])
-        .filter((app: PaymentApp) => selectedApps.includes(app.id));
+    // Only run if logged in and apps are loaded
+    if (user && userPaymentApps.length > 0) {
+      const initialOrderFromDB = [...userPaymentApps]
+        .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+        .map(upa => upa.payment_app_id);
 
-    // Sort initially based on existing priority from userPaymentApps if available, otherwise by current selection order
-    const initialOrder = userPaymentApps && userPaymentApps.length > 0
-     ? [...userPaymentApps]
-         .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
-         .map(upa => upa.payment_app_id)
-         .filter(id => selectedApps.includes(id)) // Filter based on current selection
-     : selectedApps; // Fallback to selection order
-
-    // Ensure all currently selected apps are in the initialOrder, adding any missing ones at the end
-    const finalInitialOrder = [...initialOrder];
-    selectedApps.forEach(id => {
-        if (!finalInitialOrder.includes(id)) {
-            finalInitialOrder.push(id);
-        }
-    });
-
-    // <<< Only update state if the order actually changed >>>
-    if (JSON.stringify(finalInitialOrder) !== JSON.stringify(orderedAppIds)) {
-       console.log("Updating orderedAppIds due to dependency change:", finalInitialOrder); // Optional: for debugging
-       setOrderedAppIds(finalInitialOrder);
+      // Set state only if it differs from the current state
+      // (Avoids potential loops if userPaymentApps instance changes but content doesn't)
+      if (JSON.stringify(initialOrderFromDB) !== JSON.stringify(orderedAppIds)) {
+          console.log("Setting initial orderedAppIds from DB:", initialOrderFromDB);
+          setOrderedAppIds(initialOrderFromDB);
+      }
+    } else if (!user) {
+        // Optional: Reset order on logout or for guest mode initialization if needed
+        // If guest order is handled entirely by local storage and PrioritySettings initial state,
+        // this might not be necessary.
+        // setOrderedAppIds([]); // Example reset
     }
-
-  }, [selectedApps, userPaymentApps, paymentApps, orderedAppIds]); // <<< Add orderedAppIds to dependency array >>>
+    // <<< Update dependency array >>>
+  }, [user, userPaymentApps]); // Depend only on user login state and fetched prioritized apps
 
   // --- Existing useEffect for showAppSelector --- START ---
    useEffect(() => {
@@ -205,23 +200,51 @@ export default function Dashboard() {
     setCapturedImage(imageDataUrl);
     setIdentifiedServices([]);
     setCameraError('');
+    setIsRecognizing(true);
+    setTimeout(() => {
+        handleResult(['PayPay', 'LINE Pay']);
+    }, 2000);
+
   }, []);
 
   const handleResult = useCallback((services: string[]) => {
     console.log('Image recognition result:', services);
     setIdentifiedServices(services);
+    setIsRecognizing(false);
     setCameraError('');
+
     if (services.length > 0) {
         toast.success(`${services.join(', ')} が見つかりました。`);
+
+        const userApps = appsToDisplay;
+        let appToLaunch: PaymentApp | null = null;
+
+        for (const app of userApps) {
+           if (services.some(service => service.toLowerCase() === app.name.toLowerCase())) {
+               appToLaunch = app;
+               break;
+           }
+        }
+
+        if (appToLaunch) {
+            console.log(`Auto-launching highest priority app: ${appToLaunch.name}`);
+            toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
+            openPaymentApp(appToLaunch);
+        } else {
+            console.log('No registered app found among identified services.');
+            toast.info('利用可能な登録済みアプリが見つかりませんでした。');
+        }
+
     } else {
-        toast.info('対応する決済サービスが見つかりませんでした。');
+        // Message moved to render logic
     }
-  }, []);
+  }, [appsToDisplay]);
 
   const handleError = useCallback((message: string) => {
     console.error('Camera/API Error:', message);
     setCameraError(message);
     setIdentifiedServices([]);
+    setIsRecognizing(false);
     toast.error(`エラー: ${message}`);
   }, []);
   // --- Camera Feature Callbacks --- END ---
@@ -425,36 +448,64 @@ export default function Dashboard() {
        </div>
       {/* --- Header --- END --- */}
 
-      {/* --- Display Payment Apps --- START --- */}
-       {displayApps.length > 0 ? (
-         <div className="flex flex-col gap-4">
-           {displayApps.map((app: PaymentApp) => (
-             <PaymentAppCard
-                 key={app.id}
-                 app={app}
-                 isHighlighted={highlightedAppNames.has(app.name)}
-             />
-           ))}
-         </div>
-       ) : (
-          // Improved Empty State Condition
-          !loading && !isUserAppsLoading && !showAppSelector && (
-             <Card className="mt-6">
-                 <CardHeader>
-                     <CardTitle>決済アプリがありません</CardTitle>
-                     <CardDescription className="flex items-center">
-                         右上の<Settings className="inline-block h-4 w-4 mx-1"/>ボタンから利用する決済アプリを追加・設定してください。
-                     </CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                     <Button onClick={() => setIsSettingsDialogOpen(true)}>
-                         <CirclePlus className="mr-2 h-4 w-4" /> アプリを設定
-                     </Button>
-                 </CardContent>
-             </Card>
-         )
-       )}
-      {/* --- Display Payment Apps --- END --- */}
+      {/* --- App List Card (Add bottom margin) --- */}
+      <Card className="shadow-sm mb-8">
+         <CardHeader>
+            <CardTitle>利用可能な決済アプリ</CardTitle>
+         </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {displayApps.map((app: PaymentApp) => (
+            <PaymentAppCard
+              key={app.id}
+              app={app}
+              isHighlighted={highlightedAppNames.has(app.name)}
+              onAppClick={async () => {
+                toast.info(`${app.name} を起動します...`);
+                openPaymentApp(app);
+              }}
+            />
+          ))}
+          {/* ... Skeleton and Empty State ... */}
+        </CardContent>
+      </Card>
+
+      {/* --- Identified Services Section (Conditional Rendering) --- */}
+      {(isRecognizing || identifiedServices.length > 0 || cameraError) && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-medium flex items-center">
+              <ScanEye className="mr-2 h-5 w-5" />
+              お店で使える決済サービス (スキャン結果)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isRecognizing ? (
+              <div className="flex items-center justify-center py-4 text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                認識中...
+              </div>
+            ) : cameraError ? (
+              <Alert variant="destructive" className="mt-0">
+                <XCircle className="h-4 w-4" />
+                <AlertTitle>認識エラー</AlertTitle>
+                <AlertDescription>{cameraError}</AlertDescription>
+              </Alert>
+            ) : identifiedServices.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {identifiedServices.map(serviceName => (
+                  <Badge key={serviceName} variant="secondary" className="text-sm">
+                    {serviceName}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                対応する決済サービスが見つかりませんでした。
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );
