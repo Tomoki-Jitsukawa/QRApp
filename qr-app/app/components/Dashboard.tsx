@@ -140,7 +140,6 @@ export default function Dashboard() {
   const openCamera = () => {
     // ★ スキャン開始前に必ず以前の結果をリセットする
     setIdentifiedServices([]);
-    setRecognitionError(null);
     // capturedImage や recognitionError は useQRCodeRecognition フック側で
     // startRecognition 呼び出し時にリセットされることを期待。
     // 必要であればフック側も修正。
@@ -307,7 +306,7 @@ export default function Dashboard() {
                     <span className="hidden sm:inline">スキャン</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
+                <DialogContent className="max-w-sm">
                   <DialogHeader>
                     <DialogTitle>カメラで決済サービスを認識</DialogTitle>
                     <DialogDescription>
@@ -363,8 +362,8 @@ export default function Dashboard() {
         getBrandColor={getBrandColor}
       />
 
-      {/* --- Identified Services Section (Conditional Rendering Corrected) --- */}
-      {(isRecognizing || identifiedServices.length > 0) && (
+      {/* --- Identified Services Section (再表示) --- */}
+      {(isRecognizing || identifiedServices.length > 0 || recognitionError !== null) && (
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-medium flex items-center">
@@ -374,6 +373,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {(() => {
+              // This empty self-invoking function seems unnecessary and can be removed.
               return null;
             })()}
             {isRecognizing ? (
@@ -396,6 +396,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
+              // This block should now be reachable if !isRecognizing and identifiedServices is empty and no error
               <p className="text-sm text-muted-foreground text-center py-4">
                 対応する決済サービスが見つかりませんでした。
               </p>

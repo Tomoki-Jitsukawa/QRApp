@@ -36,11 +36,11 @@ export const PaymentAppGrid: React.FC<PaymentAppGridProps> = ({
   // Display skeletons while loading (optional)
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="p-4 border rounded-lg shadow-sm animate-pulse bg-muted">
-            <div className="h-16 w-16 mx-auto mb-3 rounded-md bg-muted-foreground/20"></div>
-            <div className="h-4 w-3/4 mx-auto rounded bg-muted-foreground/20"></div>
+      <div className="grid grid-cols-1 gap-3 max-w-sm mx-auto animate-pulse">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="p-4 border rounded-lg shadow-sm bg-muted h-20 flex items-center">
+            <div className="h-10 w-10 mr-4 rounded-md bg-muted-foreground/20"></div>
+            <div className="h-4 w-3/4 rounded bg-muted-foreground/20"></div>
           </div>
         ))}
       </div>
@@ -62,7 +62,7 @@ export const PaymentAppGrid: React.FC<PaymentAppGridProps> = ({
 
   // Display the grid of payment app cards
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 gap-3 max-w-sm mx-auto">
       {sortedAppsToDisplay.map((app) => (
         <PaymentAppCard
           key={app.id}
