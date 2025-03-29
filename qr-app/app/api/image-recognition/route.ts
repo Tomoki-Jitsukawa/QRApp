@@ -9,7 +9,7 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash', // または gemini-pro-vision など、用途に応じて
+    model: 'gemini-2.0-flash', // または gemini-pro-vision など、用途に応じて
 });
 
 // 安全性設定 (必要に応じて調整)

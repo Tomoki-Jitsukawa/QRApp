@@ -87,25 +87,48 @@ export async function POST(request: NextRequest) {
     const response = result.response;
     const text = response.text();
 
-    console.log("Gemini API Raw Response Text:", text); // Log raw response for debugging
+    console.log("Gemini API Raw Response Text:", text); // Keep this log
 
+    let serviceNames: string[] = [];
     try {
-      // Attempt to parse the text as JSON
-      const serviceNames = JSON.parse(text);
-      if (!Array.isArray(serviceNames) || !serviceNames.every(item => typeof item === 'string')) {
-         console.error("Gemini response is not a valid JSON array of strings:", text);
-         // Fallback: Try to extract names if possible, or return empty
-         // This simple fallback assumes names might be comma-separated or similar
-         const extracted = text.match(/(PayPay|LINE Pay|楽天ペイ|d払い|au PAY|メルペイ)/g);
-         return NextResponse.json({ services: extracted || [] });
+      // Attempt to extract JSON from markdown code block
+      const codeBlockRegex = /```json\s*([\s\S]*?)\s*```/;
+      const match = text.match(codeBlockRegex);
+      let jsonString = text; // Default to original text
+
+      if (match && match[1]) {
+        jsonString = match[1].trim(); // Use the content inside the code block
+        console.log("Extracted JSON string from markdown:", jsonString);
+      } else {
+         // If no markdown, try trimming the raw text just in case
+         jsonString = text.trim();
+         console.log("No markdown detected, using trimmed raw text:", jsonString);
       }
-      return NextResponse.json({ services: serviceNames });
+
+      // Attempt to parse the potentially cleaned JSON string
+      const parsed = JSON.parse(jsonString);
+
+      if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string')) {
+         console.error("Parsed response is not a valid JSON array of strings:", parsed);
+         // Fallback: Use the original raw text for regex extraction as a last resort
+         const extracted = text.match(/(PayPay|LINE Pay|楽天ペイ|d払い|au PAY|メルペイ)/g);
+         serviceNames = extracted || [];
+         console.log("Fallback regex extraction result (invalid array):", serviceNames);
+      } else {
+        serviceNames = parsed; // Successfully parsed
+        console.log("Successfully parsed service names:", serviceNames);
+      }
+
     } catch (parseError) {
-      console.error("Failed to parse Gemini response as JSON:", text, parseError);
-       // Fallback: Try to extract names if JSON parsing fails
+      console.error("Failed to parse Gemini response as JSON even after cleaning:", text, parseError);
+       // Fallback: Use the original raw text for regex extraction
        const extracted = text.match(/(PayPay|LINE Pay|楽天ペイ|d払い|au PAY|メルペイ)/g);
-      return NextResponse.json({ services: extracted || [] });
+       serviceNames = extracted || [];
+       console.log("Fallback regex extraction result (parse error):", serviceNames);
     }
+
+    // Return the final serviceNames array
+    return NextResponse.json({ services: serviceNames });
 
   } catch (error) {
     console.error("!!! Error during image recognition process:", error); // Make error log more prominent
