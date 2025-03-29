@@ -175,22 +175,39 @@ export default function Dashboard() {
 
 
   // --- Updated appsToDisplay to use priority and useMemo --- START ---
-   const appsToDisplay = useMemo(() => {
-     if (user && !isUserAppsLoading && userPaymentApps.length > 0) {
-        // Sort user's apps based on the priority field
-        return [...userPaymentApps] // Create a mutable copy
-            .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
-            .map(userApp => userApp.payment_app!) // Map to PaymentApp details
-            .filter((app): app is PaymentApp => !!app); // Type guard
-     } else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
-        // Guest mode: Use the order from selectedApps
+  const appsToDisplay = useMemo(() => {
+    // <<< Add logs here >>>
+    console.log('[appsToDisplay useMemo] Calculating...', {
+        isLoggedIn: !!user,
+        isUserAppsLoading,
+        userPaymentAppsLength: userPaymentApps?.length ?? 0,
+        selectedAppsLength: selectedApps.length,
+        paymentAppsLength: paymentApps?.length ?? 0,
+    });
+
+    // ログインユーザーの場合
+    if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
+      console.log('[appsToDisplay useMemo] Using userPaymentApps (sorted)');
+      // Sort user's apps based on the priority field
+      return [...userPaymentApps] // Create a mutable copy
+          .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+          .map(userApp => userApp.payment_app!) // Map to PaymentApp details
+          .filter((app): app is PaymentApp => !!app); // Type guard
+     }
+     // ゲストモード (または初期選択後) の場合
+     else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
+        console.log('[appsToDisplay useMemo] Using selectedApps (guest mode)');
         const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
         return selectedApps
             .map(id => appMap.get(id))
             .filter((app): app is PaymentApp => !!app);
-     } else {
+     }
+     // 上記以外の場合 (アプリデータがない、読み込み中など)
+     else {
+       console.log('[appsToDisplay useMemo] Returning empty array.');
        return [];
      }
+   // <<< Dependencies should be correct >>>
    }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
   // --- Updated appsToDisplay to use priority and useMemo --- END ---
 
@@ -230,8 +247,8 @@ export default function Dashboard() {
   }, []); // Dependencies removed: handleResult, handleError
 
   const handleResult = useCallback((services: string[]) => {
-    console.log('[handleResult] Received services from API:', services); // APIからの結果をログ出力
-    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(app => ({ name: app.name, id: app.id }))); // 比較対象のアプリ名をログ出力
+    console.log('[handleResult] Received services from API:', services);
+    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(app => ({ name: app.name, id: app.id })));
     setIdentifiedServices(services);
     setIsRecognizing(false);
     setCameraError('');
@@ -241,36 +258,41 @@ export default function Dashboard() {
 
         const userApps = appsToDisplay;
         let appToLaunch: PaymentApp | null = null;
-        let foundMatch = false; // マッチしたかどうかのフラグ
+        let foundMatch = false;
 
         for (const app of userApps) {
-           console.log(`[handleResult] Comparing service names with app: ${app.name}`); // 比較中のアプリ名をログ出力
-           // 比較ロジックをログ出力
+           console.log(`[handleResult] Comparing service names with app: name='${app.name}' (length: ${app.name?.length})`); // アプリ名を詳細にログ出力
            const isMatch = services.some(service => {
-               const serviceLower = service.toLowerCase();
-               const appNameLower = app.name.toLowerCase();
-               console.log(`  Comparing: '${serviceLower}' === '${appNameLower}' -> ${serviceLower === appNameLower}`);
+               // 比較する両方の文字列と長さをログ出力
+               const serviceLower = service?.toLowerCase() || ''; // null/undefined対策
+               const appNameLower = app.name?.toLowerCase() || ''; // null/undefined対策
+               console.log(`  Comparing: '${serviceLower}' (len:${serviceLower.length}) === '${appNameLower}' (len:${appNameLower.length}) -> ${serviceLower === appNameLower}`);
+               // 特に "PayPay" の比較を注目
+               if (serviceLower.includes('paypay') || appNameLower.includes('paypay')) {
+                  console.log(`    (PayPay comparison check: service='${service}', app.name='${app.name}')`);
+               }
                return serviceLower === appNameLower;
            });
 
            if (isMatch) {
                appToLaunch = app;
-               foundMatch = true; // マッチフラグを立てる
+               foundMatch = true;
                console.log(`[handleResult] Match found! App to launch: ${app.name} (Priority highest)`);
-               break; // 最初に見つかった最高優先度のアプリでループを抜ける
+               break;
            }
         }
 
         if (appToLaunch) {
-            console.log(`[handleResult] Attempting to call openPaymentApp for: ${appToLaunch.name}`); // openPaymentApp呼び出し直前ログ
+            console.log(`[handleResult] Attempting to call openPaymentApp for: ${appToLaunch.name}`);
             toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
             openPaymentApp(appToLaunch);
         } else {
-            // マッチしなかった理由をログ出力
             if (!foundMatch) {
                console.log('[handleResult] No matching app found in appsToDisplay for the identified services.');
+               // 認識されたサービスと登録アプリ名を再度リストアップ
+               console.log('  Recognized services:', services);
+               console.log('  Available apps:', appsToDisplay.map(a => a.name));
             } else {
-               // 基本的にここには来ないはず (appToLaunchがnullだがfoundMatchがtrue?)
                console.warn('[handleResult] Logic error: Match found but appToLaunch is null.');
             }
             toast.info('利用可能な登録済みアプリが見つかりませんでした。');
@@ -278,9 +300,7 @@ export default function Dashboard() {
 
     } else {
         console.log('[handleResult] No services identified by API.');
-        // Message moved to render logic
     }
-  // openPaymentApp を依存配列に追加 (useCallback内で直接使っているため)
   }, [appsToDisplay, openPaymentApp]);
 
   const handleError = useCallback((message: string) => {
