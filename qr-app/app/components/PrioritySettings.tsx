@@ -95,21 +95,33 @@ interface PrioritySettingsProps {
 export default function PrioritySettings({ selectedApps: initialSelectedApps, allAvailableApps, onOrderChange }: PrioritySettingsProps) {
   const [items, setItems] = useState<SortableAppItem[]>([]);
 
-  // Initialize items based on props
+  // Initialize items based on props, preserving internal order if ID sets match
   useEffect(() => {
     const appMap = new Map(allAvailableApps.map(app => [app.id, app]));
-    const newItems = initialSelectedApps
-      .map(app => appMap.get(app.id))
-      .filter((app): app is PaymentApp => !!app)
-      .map(app => ({ ...app, dndId: app.id }));
 
-    // Only update if props actually changed the list content/order
-    if (JSON.stringify(newItems.map(i => i.id)) !== JSON.stringify(items.map(i => i.id))) {
-       console.log("PrioritySettings: Updating items based on props change");
-       setItems(newItems);
+    // props から渡された ID のセット (ソート済み)
+    const propAppIdsSorted = JSON.stringify([...initialSelectedApps.map(app => app.id)].sort());
+    // 現在の内部 state の ID のセット (ソート済み)
+    const currentItemIdsSorted = JSON.stringify([...items.map(item => item.id)].sort());
+
+    // ID のセット自体が変更されたか比較
+    if (propAppIdsSorted !== currentItemIdsSorted) {
+        // 選択されているアプリのリストが変わった場合のみ、props ベースで items を再構築する
+        console.log("PrioritySettings: Set of selected app IDs changed. Resetting items based on props.");
+        const newItems = initialSelectedApps
+          .map(app => appMap.get(app.id)) // Get full app details
+          .filter((app): app is PaymentApp => !!app) // Filter out any potential misses
+          .map(app => ({ ...app, dndId: app.id })); // Add dndId
+        setItems(newItems);
+    } else {
+        // IDセットが変わっていない（順序だけが変わった可能性がある）場合は、
+        // ユーザーのドラッグ操作による内部順序を維持するため、何もしない。
+        console.log("PrioritySettings: IDs match, preserving internal order.");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSelectedApps, allAvailableApps]); // Depends on props only
+    // この Effect は、選択されているアプリのリスト (initialSelectedApps) か
+    // 全アプリリスト (allAvailableApps) が変更されたときのみ実行されるべき
+    // items を依存配列に加えるとループのリスクがあるため含めない
+  }, [initialSelectedApps, allAvailableApps]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Start dragging after 5px move
