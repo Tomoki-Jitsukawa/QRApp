@@ -6,7 +6,7 @@ import { useAuth } from '@/app/hooks/useAuth';
 import { supabase } from '@/app/lib/supabase';
 import { PaymentApp, UserPaymentApp } from '@/app/types';
 
-// Supabaseからデータを取得するためのfetcher関数 (未使用なのでコメントアウトまたは削除)
+// Supabaseからデータを取得するためのfetcher関数 (未使用なので削除)
 /*
 const fetcher = async (key: string) => {
   const { data, error } = await supabase.from(key).select(`*, payment_app:payment_apps(*)`);
@@ -19,7 +19,7 @@ const fetcher = async (key: string) => {
 export function useAllPaymentApps(): {
   paymentApps: PaymentApp[];
   isLoading: boolean;
-  isError: any; // Consider defining a more specific error type
+  isError: Error | null; // Use Error | null instead of any
   mutate: KeyedMutator<PaymentApp[]>;
 } {
   const { data, error, isLoading, mutate } = useSWR<PaymentApp[]>('payment_apps', async (key: string) => {
@@ -41,7 +41,7 @@ export function useAllPaymentApps(): {
 interface UseUserPaymentAppsResult {
   userPaymentApps: UserPaymentApp[];
   isLoading: boolean;
-  isError: any; // Consider defining a more specific error type
+  isError: Error | null; // Use Error | null instead of any
   updateUserPaymentApps: (orderedAppIds: string[]) => Promise<boolean>;
   mutate: KeyedMutator<UserPaymentApp[]>;
 }
