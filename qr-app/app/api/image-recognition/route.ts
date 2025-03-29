@@ -49,7 +49,6 @@ export async function POST(req: NextRequest) {
     const mimeType = mimeTypeMatch[1];
     const imageData = imageDataBase64.replace(/^data:image\/\w+;base64,/, ""); // Base64部分のみ取得
 
-
     const imagePart = {
         inlineData: {
             data: imageData,
@@ -57,17 +56,7 @@ export async function POST(req: NextRequest) {
         },
     };
 
-    const prompt = `
-      この画像に写っているQR決済サービスのロゴを特定し、そのサービス名をリストアップしてください。
-      例えば、「PayPay」、「LINE Pay」、「楽天ペイ」、「メルペイ」、「d払い」、「au PAY」などです。
-      他のロゴや文字は無視してください。サービス名のみをカンマ区切りで返してください。
-      読み取る際の補足ですが、[PayPay]、[楽天ペイ]、[メルペイ]、[d払い]、[au PAY]、[LINE Pay]と思わしきものは
-      空白と大文字小文字の形式を一致する形で[]内で囲ってある形式そのままの文字列で返してください。
-      また、楽天ペイはR Pay、メルペイはM Payと文字上は読み取られることが多いので、このように読み取られるような場合は
-      楽天ペイ、メルペイに変換してください。
-      もし何も見つからなければ、空の文字列を返してください。
-      例: PayPay,楽天ペイ
-    `;
+    const prompt = `# 指示\n画像からQR決済サービスの公式ロゴを正確に特定し、該当するサービス名をリストアップしてください。\n\n# 対象となる決済サービスリスト (以下のリストにある名前のみを出力対象とします)\n- PayPay\n- LINE Pay\n- 楽天ペイ\n- メルペイ\n- d払い\n- au PAY\n# (必要に応じて他のサポート対象サービスを追加・削除してください)\n\n# 出力ルール\n1.  特定できたサービス名を、上記の「対象となる決済サービスリスト」に記載されている**正確な名称**で、カンマ区切り（\`,\`）で返してください。\n    *   例: \`PayPay,楽天ペイ,d払い\`\n2.  リストに記載されていないサービス名、ロゴ以外の図形や文字、背景などは**完全に無視**してください。\n3.  同じサービスが複数写っていても、出力に含めるのは**1回のみ**（重複させない）。\n4.  対象となるロゴが一つも見つからない場合は、**空の文字列(\"\")** を返してください。\n\n# 特に重要な注意点\n*   **ロゴのデザイン重視:** 画像内のテキスト断片を読むだけでなく、サービスの**公式ロゴのデザイン**と視覚的に一致するかを最優先で判断してください。\n*   **楽天ペイとメルペイの特定:**\n    *   ロゴの文字部分が「R Pay」や「r pay」のように見えても、それが楽天ペイのロゴデザインと一致する場合は、必ず「**楽天ペイ**」としてください。\n    *   ロゴの文字部分が「m Pay」や「mercari」のように見えても、それがメルペイのロゴデザインと一致する場合は、必ず「**メルペイ**」としてください。\n*   **PayPay の慎重な識別:**\n    *   「Pay」という文字を含むロゴは多いですが、**PayPay固有のロゴデザイン**と完全に一致する場合のみ「PayPay」と識別してください。他のロゴと混同しないように、特に注意深く判断してください。\n`;
 
     const result = await model.generateContent({
         contents: [{ role: "user", parts: [imagePart, { text: prompt }] }],
@@ -80,7 +69,6 @@ export async function POST(req: NextRequest) {
 
     // Geminiからの応答をパースしてサービス名の配列にする (単純なカンマ区切りを想定)
     const identifiedServices = identifiedServicesText.split(',').map(s => s.trim()).filter(s => s.length > 0);
-
 
     return NextResponse.json({ identifiedServices });
 
