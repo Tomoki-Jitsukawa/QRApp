@@ -208,7 +208,8 @@ export default function Dashboard() {
   }, []);
 
   const handleResult = useCallback((services: string[]) => {
-    console.log('Image recognition result:', services);
+    console.log('[handleResult] Received services:', services);
+    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(a => a.name));
     setIdentifiedServices(services);
     setIsRecognizing(false);
     setCameraError('');
@@ -222,20 +223,22 @@ export default function Dashboard() {
         for (const app of userApps) {
            if (services.some(service => service.toLowerCase() === app.name.toLowerCase())) {
                appToLaunch = app;
+               console.log(`[handleResult] Found matching app with highest priority: ${app.name}`);
                break;
            }
         }
 
         if (appToLaunch) {
-            console.log(`Auto-launching highest priority app: ${appToLaunch.name}`);
+            console.log(`[handleResult] Calling openPaymentApp for: ${appToLaunch.name}`);
             toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
             openPaymentApp(appToLaunch);
         } else {
-            console.log('No registered app found among identified services.');
+            console.log('[handleResult] No registered app found among identified services.');
             toast.info('利用可能な登録済みアプリが見つかりませんでした。');
         }
 
     } else {
+        console.log('[handleResult] No services identified.');
         // Message moved to render logic
     }
   }, [appsToDisplay]);
@@ -321,7 +324,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="space-y-8 p-4 md:p-6">
+    <div className="space-y-8 p-4 md:p-6 pb-24">
       <Toaster position="top-center" richColors />
 
       {/* --- Header --- START --- */}
@@ -469,7 +472,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* --- Identified Services Section (Conditional Rendering) --- */}
+      {/* --- Identified Services Section (Conditional Rendering with Logging) --- */}
       {(isRecognizing || identifiedServices.length > 0 || cameraError) && (
         <Card className="shadow-sm">
           <CardHeader>
@@ -479,6 +482,10 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {(() => {
+              console.log(`[Render Identified Services] isRecognizing: ${isRecognizing}, cameraError: ${cameraError}, services.length: ${identifiedServices.length}`);
+              return null; // Return null to prevent rendering issues
+            })()}
             {isRecognizing ? (
               <div className="flex items-center justify-center py-4 text-muted-foreground">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
