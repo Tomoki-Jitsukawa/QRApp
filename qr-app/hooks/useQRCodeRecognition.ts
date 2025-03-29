@@ -23,7 +23,7 @@ export function useQRCodeRecognition() {
 
   // Internal handlers that update the hook's state
   const handleSuccess = useCallback((result: RecognitionResult) => {
-    // console.log('Recognition successful:', result);
+    console.log('[Hook] API success, result:', result);
     setRecognizedServices(result.services || []);
     setRecognitionError(null);
     setIsRecognizing(false);
@@ -49,7 +49,7 @@ export function useQRCodeRecognition() {
 
   // The function to be called by the component to start the recognition process
   const startRecognition = useCallback(async (imageDataUrl: string) => {
-    // console.log('Starting recognition process...');
+    console.log('[Hook] startRecognition called. Resetting states...');
     setCapturedImage(imageDataUrl); // Store the captured image data URL
     setRecognizedServices([]);
     setRecognitionError(null);

@@ -88,6 +88,7 @@ export default function Dashboard() {
 
   // --- Callback for successful recognition ---
   const handleRecognitionResult = useCallback((result: RecognitionResult) => {
+    console.log('[Dashboard] handleRecognitionResult received:', result); // ★ Log
     const services = result.services || [];
     setIdentifiedServices(services);
 
@@ -138,6 +139,7 @@ export default function Dashboard() {
 
   // カメラダイアログを開く関数
   const openCamera = () => {
+    console.log('[Dashboard] openCamera called. Resetting identifiedServices...'); // ★ Log
     // ★ スキャン開始前に必ず以前の結果をリセットする
     setIdentifiedServices([]);
     // capturedImage や recognitionError は useQRCodeRecognition フック側でリセットされる
@@ -311,7 +313,7 @@ export default function Dashboard() {
                       お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div className="py-4 space-y-4 max-h-[45vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={startRecognition}
                       onError={(msg) => { /* Errors are handled by the hook's callback */ }}
