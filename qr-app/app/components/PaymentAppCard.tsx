@@ -14,9 +14,10 @@ import { X } from 'lucide-react';
 
 interface PaymentAppCardProps {
   app: PaymentApp;
+  isHighlighted?: boolean;
 }
 
-export default function PaymentAppCard({ app }: PaymentAppCardProps) {
+export default function PaymentAppCard({ app, isHighlighted = false }: PaymentAppCardProps) {
   const [showQr, setShowQr] = useState(false);
   const [showStoreOption, setShowStoreOption] = useState(false);
   const [appLaunched, setAppLaunched] = useState(false);
@@ -69,41 +70,35 @@ export default function PaymentAppCard({ app }: PaymentAppCardProps) {
   };
   
   return (
-    <Card className="group overflow-hidden transition-all duration-300 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800/50 border-gray-100 dark:border-gray-800">
-      <CardContent className="p-0 relative">
-        <Button
-          variant="ghost"
-          className="w-full p-6 h-auto rounded-none flex flex-col items-center justify-center space-y-3 text-left"
-          onClick={handleClick}
-        >
-          <div className="flex flex-col items-center space-y-3">
-            {app.logo_url ? (
-              <div className="flex-shrink-0 w-16 h-16 relative group-hover:scale-110 transition-transform duration-300">
-                <Image
-                  src={app.logo_url}
-                  alt={app.name}
-                  width={64}
-                  height={64}
-                  className="object-contain rounded-lg"
-                />
-              </div>
-            ) : (
-              <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <span className="text-gray-500 dark:text-gray-300 text-xl font-bold">{app.name.charAt(0)}</span>
-              </div>
-            )}
-            <div className="flex-1 text-center">
-              <h3 className="font-medium text-foreground">{app.name}</h3>
-              {app.api_available && (
-                <Badge variant="secondary" className="mt-1 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400">
-                  API連携可能
-                </Badge>
-              )}
-            </div>
+    <Card
+      className={`group overflow-hidden transition-all duration-300 hover:shadow-lg dark:hover:shadow-primary/20 border-2 cursor-pointer ${isHighlighted ? 'border-primary shadow-md' : 'border-muted hover:border-muted-foreground/50'}`}
+      onClick={handleClick}
+    >
+      <CardContent className="p-4 relative flex flex-row items-center justify-start space-x-4">
+        {app.logo_url ? (
+          <div className="flex-shrink-0 w-10 h-10 relative">
+            <Image
+              src={app.logo_url}
+              alt={app.name}
+              width={40}
+              height={40}
+              className="object-contain rounded-md"
+            />
           </div>
-        </Button>
+        ) : (
+          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-md flex items-center justify-center">
+            <span className="text-gray-500 dark:text-gray-300 text-lg font-bold">{app.name.charAt(0)}</span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-foreground truncate">{app.name}</h3>
+          {app.api_available && (
+            <Badge variant="secondary" className="mt-1 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 text-xs">
+              API連携可能
+            </Badge>
+          )}
+        </div>
         
-        {/* ストアオプションのバッジ（モバイルのみ、必要な場合） */}
         {!isPC && showStoreOption && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-indigo-500 to-purple-600 py-2 px-3 rounded-b-lg">
             <div className="flex justify-between items-center">
@@ -120,7 +115,6 @@ export default function PaymentAppCard({ app }: PaymentAppCardProps) {
           </div>
         )}
         
-        {/* QRコードダイアログ（PCの場合のみ） */}
         {isPC && (
           <Dialog open={showQr} onOpenChange={setShowQr}>
             <DialogContent className="max-w-sm">
@@ -142,7 +136,6 @@ export default function PaymentAppCard({ app }: PaymentAppCardProps) {
                   スマートフォンでスキャンして{app.name}を開きます
                 </p>
                 
-                {/* PCでもストアリンクを表示 */}
                 {getStoreLink(app) && (
                   <div className="mt-4">
                     <Button 

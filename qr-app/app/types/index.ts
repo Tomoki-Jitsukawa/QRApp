@@ -26,7 +26,7 @@ export interface UserPaymentApp {
   user_id: string;
   payment_app_id: string;
   payment_app?: PaymentApp;
-  display_order: number;
+  priority?: number | null;
   is_active: boolean;
   created_at?: string;
 }
