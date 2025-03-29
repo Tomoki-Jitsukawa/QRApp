@@ -94,7 +94,6 @@ interface PrioritySettingsProps {
 // Main Priority Settings component
 export default function PrioritySettings({ selectedApps: initialSelectedApps, allAvailableApps, onOrderChange }: PrioritySettingsProps) {
   const [items, setItems] = useState<SortableAppItem[]>([]);
-  const [isInternalUpdate, setIsInternalUpdate] = useState(false); // Flag to track internal updates
 
   // Initialize items based on props
   useEffect(() => {
@@ -106,21 +105,11 @@ export default function PrioritySettings({ selectedApps: initialSelectedApps, al
 
     // Only update if props actually changed the list content/order
     if (JSON.stringify(newItems.map(i => i.id)) !== JSON.stringify(items.map(i => i.id))) {
+       console.log("PrioritySettings: Updating items based on props change");
        setItems(newItems);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSelectedApps, allAvailableApps]); // Depends on props
-
-  // <<< Effect to call onOrderChange when items change internally >>>
-  useEffect(() => {
-     // Only call onOrderChange if the update was internal (drag end)
-     if (isInternalUpdate) {
-         console.log("Internal update detected, calling onOrderChange");
-         onOrderChange(items.map(item => item.id));
-         setIsInternalUpdate(false); // Reset the flag
-     }
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, isInternalUpdate]); // Dependency on items and the flag
+  }, [initialSelectedApps, allAvailableApps]); // Depends on props only
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Start dragging after 5px move
@@ -129,21 +118,27 @@ export default function PrioritySettings({ selectedApps: initialSelectedApps, al
     })
   );
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => { // <<< Wrap in useCallback
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
+      let newOrderedItems: SortableAppItem[] = [];
       setItems((currentItems) => {
         const oldIndex = currentItems.findIndex((item) => item.dndId === active.id);
         const newIndex = currentItems.findIndex((item) => item.dndId === over.id);
-        const newOrderedItems = arrayMove(currentItems, oldIndex, newIndex);
-        // Set flag to indicate internal update
-        setIsInternalUpdate(true);
+        newOrderedItems = arrayMove(currentItems, oldIndex, newIndex);
+        console.log("PrioritySettings: Items reordered internally via drag", newOrderedItems.map(i => i.id));
         return newOrderedItems;
       });
+
+      if (newOrderedItems.length > 0) {
+          console.log("PrioritySettings: Drag end, calling onOrderChange directly with order:", newOrderedItems.map(item => item.id));
+          onOrderChange(newOrderedItems.map(item => item.id));
+      } else {
+          console.warn("PrioritySettings: newOrderedItems was empty after setItems call in handleDragEnd. onOrderChange not called.");
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // No dependencies needed for useCallback if it only uses setItems
+  }, [onOrderChange]);
 
   return (
     <DndContext

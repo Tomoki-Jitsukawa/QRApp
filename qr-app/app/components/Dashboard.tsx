@@ -136,6 +136,16 @@ export default function Dashboard() {
     setErrorCallback(handleRecognitionError);
   }, [setErrorCallback, handleRecognitionError]);
 
+  // カメラダイアログを開く関数
+  const openCamera = () => {
+    // ★ スキャン開始前に必ず以前の結果をリセットする
+    setIdentifiedServices([]);
+    // capturedImage や recognitionError は useQRCodeRecognition フック側で
+    // startRecognition 呼び出し時にリセットされることを期待。
+    // 必要であればフック側も修正。
+    setIsCameraDialogOpen(true);
+  };
+
   // <<< Modify useEffect to ONLY set initial order based on userPaymentApps >>>
   useEffect(() => {
     if (user && userPaymentApps.length > 0) {
