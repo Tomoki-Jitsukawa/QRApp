@@ -140,10 +140,8 @@ export default function Dashboard() {
   const openCamera = () => {
     // ★ スキャン開始前に必ず以前の結果をリセットする
     setIdentifiedServices([]);
-    // capturedImage や recognitionError は useQRCodeRecognition フック側で
-    // startRecognition 呼び出し時にリセットされることを期待。
-    // 必要であればフック側も修正。
-    setIsCameraDialogOpen(true);
+    // capturedImage や recognitionError は useQRCodeRecognition フック側でリセットされる
+    setIsCameraDialogOpen(true); // 状態リセットの後にダイアログを開く
   };
 
   // <<< Modify useEffect to ONLY set initial order based on userPaymentApps >>>
@@ -306,19 +304,58 @@ export default function Dashboard() {
                     <span className="hidden sm:inline">スキャン</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-w-xs">
                   <DialogHeader>
                     <DialogTitle>カメラで決済サービスを認識</DialogTitle>
                     <DialogDescription>
                       お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4 space-y-4 max-h-[80vh] overflow-y-auto">
+                  <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={startRecognition}
                       onError={(msg) => { /* Errors are handled by the hook's callback */ }}
                       isProcessing={isRecognizing}
                     />
+
+                    {/* --- Identified Services Section (移動してきた) --- */}
+                    {(isRecognizing || identifiedServices.length > 0 || recognitionError !== null) && (
+                      <Card className="shadow-sm mt-4"> {/* 少し上にマージンを追加 */} 
+                        {/* カードヘッダーはダイアログにあるので削除しても良いかも？ */}
+                        {/* <CardHeader>
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <ScanEye className="mr-2 h-5 w-5" />
+                            お店で使える決済サービス (スキャン結果)
+                          </CardTitle>
+                        </CardHeader> */}
+                        <CardContent className="pt-4"> {/* ヘッダー削除に伴いptを追加 */} 
+                          {isRecognizing ? (
+                            <div className="flex items-center justify-center py-4 text-muted-foreground">
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              認識中...
+                            </div>
+                          ) : recognitionError ? (
+                            <Alert variant="destructive" className="mt-0">
+                              <XCircle className="h-4 w-4" />
+                              <AlertTitle>認識エラー</AlertTitle>
+                              <AlertDescription>{recognitionError.message}</AlertDescription>
+                            </Alert>
+                          ) : identifiedServices.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {identifiedServices.map(serviceName => (
+                                <Badge key={serviceName} variant="secondary" className="text-sm">
+                                  {serviceName}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              対応する決済サービスが見つかりませんでした。
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                    <DialogFooter>
                      <Button variant="outline" onClick={() => setIsCameraDialogOpen(false)}>閉じる</Button>
@@ -361,49 +398,6 @@ export default function Dashboard() {
         }}
         getBrandColor={getBrandColor}
       />
-
-      {/* --- Identified Services Section (再表示) --- */}
-      {(isRecognizing || identifiedServices.length > 0 || recognitionError !== null) && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center">
-              <ScanEye className="mr-2 h-5 w-5" />
-              お店で使える決済サービス (スキャン結果)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              // This empty self-invoking function seems unnecessary and can be removed.
-              return null;
-            })()}
-            {isRecognizing ? (
-              <div className="flex items-center justify-center py-4 text-muted-foreground">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                認識中...
-              </div>
-            ) : recognitionError ? (
-              <Alert variant="destructive" className="mt-0">
-                <XCircle className="h-4 w-4" />
-                <AlertTitle>認識エラー</AlertTitle>
-                <AlertDescription>{recognitionError.message}</AlertDescription>
-              </Alert>
-            ) : identifiedServices.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {identifiedServices.map(serviceName => (
-                  <Badge key={serviceName} variant="secondary" className="text-sm">
-                    {serviceName}
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              // This block should now be reachable if !isRecognizing and identifiedServices is empty and no error
-              <p className="text-sm text-muted-foreground text-center py-4">
-                対応する決済サービスが見つかりませんでした。
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
     </div>
   );
