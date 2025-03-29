@@ -89,16 +89,16 @@ export default function Dashboard() {
   // --- Callback for successful recognition ---
   const handleRecognitionResult = useCallback((result: RecognitionResult) => {
     console.log('[Dashboard] handleRecognitionResult received:', result); // ★ Log
-    const services = result.services || [];
-    setIdentifiedServices(services);
+    const uniqueServices = result.services ? [...new Set(result.services)] : [];
+    setIdentifiedServices(uniqueServices);
 
-    if (services.length > 0) {
+    if (uniqueServices.length > 0) {
       const userApps = appsToDisplay;
       let appToLaunch: PaymentApp | null = null;
       let foundMatch = false;
 
       for (const app of userApps) {
-        const isMatch = services.some((service: string) => {
+        const isMatch = uniqueServices.some((service: string) => {
           const serviceLower = service?.toLowerCase() || '';
           const appNameLower = app.name?.toLowerCase() || '';
           return serviceLower === appNameLower;
@@ -306,14 +306,14 @@ export default function Dashboard() {
                     <span className="hidden sm:inline">スキャン</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-xs">
+                <DialogContent className="max-w-sm">
                   <DialogHeader>
                     <DialogTitle>カメラで決済サービスを認識</DialogTitle>
                     <DialogDescription>
                       お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4 space-y-4 max-h-[45vh] overflow-y-auto">
+                  <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={startRecognition}
                       onError={(msg) => { /* Errors are handled by the hook's callback */ }}
