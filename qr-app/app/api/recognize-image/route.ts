@@ -31,6 +31,7 @@ const safetySettings = [
 
 // Helper function to convert Data URL to Generative Part
 function fileToGenerativePart(dataUrl: string): { inlineData: { data: string; mimeType: string } } | null {
+  console.log("Received Data URL (start):", dataUrl.substring(0, 50) + "..."); // Log start of Data URL
   const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.*)$/);
   if (!match) {
     console.error("Invalid image data URL format");
@@ -38,6 +39,8 @@ function fileToGenerativePart(dataUrl: string): { inlineData: { data: string; mi
   }
   const mimeType = match[1];
   const base64Data = match[2];
+  console.log("Extracted mimeType:", mimeType); // Log mimeType
+  console.log("Extracted base64Data (start):", base64Data.substring(0, 50) + "..."); // Log start of base64 data
   return {
     inlineData: {
       data: base64Data,
@@ -53,12 +56,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const { imageDataUrl } = await request.json();
+    console.log("Received request with imageDataUrl (start):", imageDataUrl?.substring(0, 50) + "..."); // Log received URL again
 
     if (!imageDataUrl || typeof imageDataUrl !== 'string') {
       return NextResponse.json({ error: "Missing or invalid imageDataUrl" }, { status: 400 });
     }
 
     const imagePart = fileToGenerativePart(imageDataUrl);
+    console.log("Generated imagePart:", imagePart ? { mimeType: imagePart.inlineData.mimeType, dataStart: imagePart.inlineData.data.substring(0, 50) + "..." } : null); // Log the generated part
 
     if (!imagePart) {
         return NextResponse.json({ error: "Invalid image data format" }, { status: 400 });
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
       認識可能なサービス例: PayPay, LINE Pay, 楽天ペイ, d払い, au PAY, メルペイ
     `;
 
+    console.log("Calling Gemini API with imagePart:", imagePart ? "Exists" : "Null"); // Confirm imagePart before API call
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [imagePart, { text: prompt }] }],
       generationConfig,
@@ -102,8 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    // Provide a more generic error message to the client
+    console.error("!!! Error during image recognition process:", error); // Make error log more prominent
     return NextResponse.json({ error: "Failed to process image recognition." }, { status: 500 });
   }
 } 

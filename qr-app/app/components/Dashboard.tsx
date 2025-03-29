@@ -230,8 +230,8 @@ export default function Dashboard() {
   }, []); // Dependencies removed: handleResult, handleError
 
   const handleResult = useCallback((services: string[]) => {
-    console.log('[handleResult] Received services:', services);
-    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(a => a.name));
+    console.log('[handleResult] Received services from API:', services); // APIからの結果をログ出力
+    console.log('[handleResult] Current appsToDisplay (priority order):', appsToDisplay.map(app => ({ name: app.name, id: app.id }))); // 比較対象のアプリ名をログ出力
     setIdentifiedServices(services);
     setIsRecognizing(false);
     setCameraError('');
@@ -241,29 +241,47 @@ export default function Dashboard() {
 
         const userApps = appsToDisplay;
         let appToLaunch: PaymentApp | null = null;
+        let foundMatch = false; // マッチしたかどうかのフラグ
 
         for (const app of userApps) {
-           if (services.some(service => service.toLowerCase() === app.name.toLowerCase())) {
+           console.log(`[handleResult] Comparing service names with app: ${app.name}`); // 比較中のアプリ名をログ出力
+           // 比較ロジックをログ出力
+           const isMatch = services.some(service => {
+               const serviceLower = service.toLowerCase();
+               const appNameLower = app.name.toLowerCase();
+               console.log(`  Comparing: '${serviceLower}' === '${appNameLower}' -> ${serviceLower === appNameLower}`);
+               return serviceLower === appNameLower;
+           });
+
+           if (isMatch) {
                appToLaunch = app;
-               console.log(`[handleResult] Found matching app with highest priority: ${app.name}`);
-               break;
+               foundMatch = true; // マッチフラグを立てる
+               console.log(`[handleResult] Match found! App to launch: ${app.name} (Priority highest)`);
+               break; // 最初に見つかった最高優先度のアプリでループを抜ける
            }
         }
 
         if (appToLaunch) {
-            console.log(`[handleResult] Calling openPaymentApp for: ${appToLaunch.name}`);
+            console.log(`[handleResult] Attempting to call openPaymentApp for: ${appToLaunch.name}`); // openPaymentApp呼び出し直前ログ
             toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
             openPaymentApp(appToLaunch);
         } else {
-            console.log('[handleResult] No registered app found among identified services.');
+            // マッチしなかった理由をログ出力
+            if (!foundMatch) {
+               console.log('[handleResult] No matching app found in appsToDisplay for the identified services.');
+            } else {
+               // 基本的にここには来ないはず (appToLaunchがnullだがfoundMatchがtrue?)
+               console.warn('[handleResult] Logic error: Match found but appToLaunch is null.');
+            }
             toast.info('利用可能な登録済みアプリが見つかりませんでした。');
         }
 
     } else {
-        console.log('[handleResult] No services identified.');
+        console.log('[handleResult] No services identified by API.');
         // Message moved to render logic
     }
-  }, [appsToDisplay]);
+  // openPaymentApp を依存配列に追加 (useCallback内で直接使っているため)
+  }, [appsToDisplay, openPaymentApp]);
 
   const handleError = useCallback((message: string) => {
     console.error('Camera/API Error:', message);
