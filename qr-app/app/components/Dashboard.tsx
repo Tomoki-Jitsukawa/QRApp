@@ -371,8 +371,8 @@ export default function Dashboard() {
                   <div className="py-4 space-y-4 max-h-[80vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={handleCapture}
-                      onResult={handleResult}
                       onError={handleError}
+                      isProcessing={isRecognizing}
                     />
                      {cameraError && (
                        <Alert variant="destructive">
