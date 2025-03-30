@@ -19,13 +19,13 @@ const fetcher = async (key: string) => {
 export function useAllPaymentApps(): {
   paymentApps: PaymentApp[];
   isLoading: boolean;
-  isError: Error | null; // Use Error | null instead of any
+  isError: Error | null; // any の代わりに Error | null を使用
   mutate: KeyedMutator<PaymentApp[]>;
 } {
   const { data, error, isLoading, mutate } = useSWR<PaymentApp[]>('payment_apps', async (key: string) => {
     const { data, error } = await supabase.from(key).select('*').order('name'); // 名前順で取得
     if (error) throw error;
-    return data || []; // Return empty array if data is null
+    return data || []; // data が null の場合は空配列を返す
   });
 
   return {
@@ -41,7 +41,7 @@ export function useAllPaymentApps(): {
 interface UseUserPaymentAppsResult {
   userPaymentApps: UserPaymentApp[];
   isLoading: boolean;
-  isError: Error | null; // Use Error | null instead of any
+  isError: Error | null; // any の代わりに Error | null を使用
   updateUserPaymentApps: (orderedAppIds: string[]) => Promise<boolean>;
   mutate: KeyedMutator<UserPaymentApp[]>;
 }
@@ -90,7 +90,7 @@ export function useUserPaymentApps(): UseUserPaymentAppsResult {
       // 1. 現在のユーザーのアプリを取得 (トランザクションの一部として考える)
       const { data: currentAppsData, error: fetchError } = await supabase
         .from('user_payment_apps')
-        .select('payment_app_id') // Only select needed field
+        .select('payment_app_id') // 必要なフィールドのみ選択
         .eq('user_id', userId);
 
       if (fetchError) {
@@ -110,13 +110,13 @@ export function useUserPaymentApps(): UseUserPaymentAppsResult {
       const newAppIdsSet = new Set(orderedAppIds);
       const appsToDelete = Array.from(currentAppIds).filter((id: string) => !newAppIdsSet.has(id));
 
-      // --- Perform operations (ideally in a transaction, but Supabase JS client doesn't directly support it) ---
-      // 3a. Delete apps no longer selected
+      // --- 操作を実行 (理想的にはトランザクション内だが、Supabase JS クライアントは直接サポートしていない) ---
+      // 3a. 選択されなくなったアプリを削除
       if (appsToDelete.length > 0) {
         const { error: deleteError } = await supabase
           .from('user_payment_apps')
           .delete()
-          .eq('user_id', userId) // Ensure we only delete for the current user
+          .eq('user_id', userId) // 現在のユーザーのデータのみ削除することを保証
           .in('payment_app_id', appsToDelete);
         if (deleteError) {
             console.error("Delete error:", deleteError);
@@ -124,21 +124,21 @@ export function useUserPaymentApps(): UseUserPaymentAppsResult {
         }
       }
 
-      // 3b. Upsert the new selection and order
+      // 3b. 新しい選択と順序をUpsert
       if (appsToUpsert.length > 0) {
           const { error: upsertError } = await supabase
               .from('user_payment_apps')
-              .upsert(appsToUpsert, { onConflict: 'user_id, payment_app_id' }); // Use constraint name if available for better clarity
+              .upsert(appsToUpsert, { onConflict: 'user_id, payment_app_id' }); // 利用可能であれば、より明確にするために制約名を使用
           if (upsertError) {
               console.error("Upsert error:", upsertError);
               throw upsertError;
           }
       }
-      // --- End operations ---
+      // --- 操作終了 ---
 
       // 4. SWRキャッシュを更新してUIに即時反映
-      // Optimistic update might be better here, but revalidation is simpler
-      await mutate(); // Trigger re-fetch
+      // ここではオプティミスティックアップデートの方が良いかもしれないが、再検証の方がシンプル
+      await mutate(); // 再フェッチを実行
       return true;
 
     } catch (error) {

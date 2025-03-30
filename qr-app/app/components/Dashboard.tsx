@@ -63,7 +63,7 @@ export default function Dashboard() {
     setErrorCallback,
   } = useQRCodeRecognition();
   
-  // State to hold the services identified by the hook's callback
+  // フックのコールバックによって識別されたサービスを保持する状態
   const [identifiedServices, setIdentifiedServices] = useState<string[]>([]);
 
   // --- 1. appsToDisplay を定義 ---
@@ -86,9 +86,9 @@ export default function Dashboard() {
      }
    }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
 
-  // --- Callback for successful recognition ---
+  // --- 認識成功時のコールバック ---
   const handleRecognitionResult = useCallback((result: RecognitionResult) => {
-    console.log('[Dashboard] handleRecognitionResult received:', result); // ★ Log
+    console.log('[Dashboard] handleRecognitionResult received:', result); // ★ ログ
     const uniqueServices = result.services ? [...new Set(result.services)] : [];
     setIdentifiedServices(uniqueServices);
 
@@ -123,12 +123,12 @@ export default function Dashboard() {
     }
   }, [appsToDisplay]);
 
-  // --- Callback for recognition error ---
+  // --- 認識エラー時のコールバック ---
   const handleRecognitionError = useCallback((error: RecognitionError) => {
     setIdentifiedServices([]);
   }, []);
 
-  // --- Register callbacks with the hook ---
+  // --- フックにコールバックを登録 ---
   useEffect(() => {
     setResultCallback(handleRecognitionResult);
   }, [setResultCallback, handleRecognitionResult]);
@@ -139,14 +139,14 @@ export default function Dashboard() {
 
   // カメラダイアログを開く関数
   const openCamera = () => {
-    console.log('[Dashboard] openCamera called. Resetting identifiedServices...'); // ★ Log
+    console.log('[Dashboard] openCamera called. Resetting identifiedServices...'); // ★ ログ
     // ★ スキャン開始前に必ず以前の結果をリセットする
     setIdentifiedServices([]);
     // capturedImage や recognitionError は useQRCodeRecognition フック側でリセットされる
     setIsCameraDialogOpen(true); // 状態リセットの後にダイアログを開く
   };
 
-  // <<< Modify useEffect to ONLY set initial order based on userPaymentApps >>>
+  // <<< userPaymentApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
   useEffect(() => {
     if (user && userPaymentApps.length > 0) {
       const initialOrderFromDB = [...userPaymentApps]
@@ -160,7 +160,7 @@ export default function Dashboard() {
     }
   }, [user, userPaymentApps]);
 
-  // --- Existing useEffect for showAppSelector --- START ---
+  // --- showAppSelector 用の既存の useEffect --- 開始 ---
    useEffect(() => {
     if ((!loading && user && userPaymentApps.length === 0 && !isUserAppsLoading) ||
         (!loading && !user && !localStorage.getItem('guestSelectedApps'))) {
@@ -187,9 +187,9 @@ export default function Dashboard() {
        setShowAppSelector(false);
     }
   }, [loading, user, userPaymentApps, isUserAppsLoading]);
-  // --- Existing useEffect for showAppSelector --- END ---
+  // --- showAppSelector 用の既存の useEffect --- 終了 ---
 
-  // --- toggleAppSelection --- START ---
+  // --- toggleAppSelection --- 開始 ---
   const toggleAppSelection = (appId: string) => {
     setSelectedApps(prev => {
       let newSelectedApps;
@@ -204,36 +204,36 @@ export default function Dashboard() {
       return newSelectedApps;
     });
   };
-  // --- toggleAppSelection --- END ---
+  // --- toggleAppSelection --- 終了 ---
 
-  // --- Updated confirmSelection to handle save triggered from SettingsDialog --- START ---
+  // --- SettingsDialog からトリガーされる保存を処理するように confirmSelection を更新 --- 開始 ---
   const handleSaveSettings = async (finalSelectionToSave: string[], finalOrderedIds: string[]) => {
     setIsSaving(true);
-    // console.log('[handleSaveSettings] Saving settings from Dashboard...', { finalSelectionToSave, finalOrderedIds }); // ログ削除済み
+    // console.log('[handleSaveSettings] Dashboardから設定を保存中...', { finalSelectionToSave, finalOrderedIds }); // ログ削除済み
 
     if (!user) {
-      // console.log('[handleSaveSettings] Saving for GUEST user.'); // ログ削除済み
+      // console.log('[handleSaveSettings] ゲストユーザーとして保存中...'); // ログ削除済み
       localStorage.setItem('guestSelectedApps', JSON.stringify(finalSelectionToSave));
-      setSelectedApps(finalSelectionToSave); // Update local state
-      setOrderedAppIds(finalOrderedIds); // Update local order state
+      setSelectedApps(finalSelectionToSave); // ローカル状態を更新
+      setOrderedAppIds(finalOrderedIds); // ローカルの順序状態を更新
       setShowAppSelector(false);
       toast.success('設定を保存しました (ゲスト)');
       setIsSettingsDialogOpen(false);
       setIsSaving(false);
-      // console.log('[handleSaveSettings] GUEST save complete.'); // ログ削除済み
+      // console.log('[handleSaveSettings] ゲスト保存完了.'); // ログ削除済み
       return;
     }
 
     try {
-      // console.log('[handleSaveSettings] Saving for LOGGED IN user.'); // ログ削除済み
-      // Save the final selection (which should already be ordered correctly by the dialog)
+      // console.log('[handleSaveSettings] ログインユーザーとして保存中...'); // ログ削除済み
+      // 最終的な選択を保存（ダイアログによって既に正しく順序付けられているはず）
       await updateUserPaymentApps(finalSelectionToSave);
-      // Update local order state after successful save
+      // 保存成功後にローカルの順序状態を更新
       setOrderedAppIds(finalOrderedIds);
       setShowAppSelector(false);
       toast.success('決済アプリの設定を保存しました');
       setIsSettingsDialogOpen(false);
-      // console.log('[handleSaveSettings] LOGGED IN save API call complete.'); // ログ削除済み
+      // console.log('[handleSaveSettings] ログインユーザー保存API呼び出し完了.'); // ログ削除済み
     } catch (error) {
       console.error('Error saving app selection:', error);
       toast.error('設定の保存に失敗しました。');
@@ -241,9 +241,9 @@ export default function Dashboard() {
       setIsSaving(false);
     }
   };
-  // --- Updated confirmSelection --- END ---
+  // --- 更新された confirmSelection --- 終了 ---
 
-  // --- Loading state --- START ---
+  // --- ローディング状態 --- 開始 ---
   if (loading || (isAllAppsLoading && showAppSelector)) {
      return (
       <div className="space-y-4 p-4">
@@ -264,9 +264,9 @@ export default function Dashboard() {
       </div>
     );
   }
-  // --- Loading state --- END ---
+  // --- ローディング状態 --- END ---
 
-  // --- App Selector UI --- START ---
+  // --- アプリ選択UI --- 開始 ---
   if (showAppSelector) {
     return (
         <AppSelector
@@ -281,24 +281,24 @@ export default function Dashboard() {
         />
     );
   }
-  // --- App Selector UI --- END ---
+  // --- アプリ選択UI --- 終了 ---
 
-  // --- Derive data for rendering --- START ---
+  // --- レンダリング用データ導出 --- 開始 ---
   const displayApps = appsToDisplay;
   const highlightedAppNames = new Set(identifiedServices);
   const selectedAppDetails = (paymentApps || [])
       .filter((app: PaymentApp) => selectedApps.includes(app.id));
-  // --- Derive data for rendering --- END ---
+  // --- レンダリング用データ導出 --- 終了 ---
 
   return (
     <div className="space-y-8 p-4 md:p-6 pb-24">
       <Toaster position="top-center" richColors />
 
-      {/* --- Header --- START --- */}
+      {/* --- ヘッダー --- 開始 --- */}
        <div className="flex justify-between items-center gap-2">
          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">QR決済アプリ</h1>
          <div className="flex items-center gap-2">
-            {/* --- Camera Dialog --- START --- */}
+            {/* --- カメラダイアログ --- 開始 --- */}
             <Dialog open={isCameraDialogOpen} onOpenChange={setIsCameraDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1">
@@ -316,11 +316,11 @@ export default function Dashboard() {
                   <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto">
                     <CameraCapture
                       onCapture={startRecognition}
-                      onError={(msg) => { /* Errors are handled by the hook's callback */ }}
+                      onError={(msg) => { /* エラーはフックのコールバックで処理される */ }}
                       isProcessing={isRecognizing}
                     />
 
-                    {/* --- Identified Services Section (移動してきた) --- */}
+                    {/* --- 認識されたサービスセクション (移動してきた) --- */}
                     {(isRecognizing || identifiedServices.length > 0 || recognitionError !== null) && (
                       <Card className="shadow-sm mt-4"> {/* 少し上にマージンを追加 */} 
                         {/* カードヘッダーはダイアログにあるので削除しても良いかも？ */}
@@ -364,33 +364,33 @@ export default function Dashboard() {
                    </DialogFooter>
                 </DialogContent>
             </Dialog>
-            {/* --- Camera Dialog --- END --- */} 
+            {/* --- カメラダイアログ --- 終了 --- */}
 
-            {/* --- Settings Dialog Trigger (No longer a full Dialog here) --- START --- */}
+            {/* --- 設定ダイアログトリガー (ここでは完全なダイアログではない) --- 開始 --- */}
              <Button variant="outline" size="sm" className="gap-1" onClick={() => setIsSettingsDialogOpen(true)}>
                <Settings className="h-4 w-4" />
                <span className="hidden sm:inline">編集</span>
              </Button>
-            {/* --- Settings Dialog Trigger --- END --- */}
+            {/* --- 設定ダイアログトリガー --- 終了 --- */}
 
-            {/* --- Render the SettingsDialog (controlled by state) --- */}
+            {/* --- SettingsDialogをレンダリング (状態によって制御) --- */}
             <SettingsDialog
                 isOpen={isSettingsDialogOpen}
                 onOpenChange={setIsSettingsDialogOpen}
                 allPaymentApps={paymentApps || []}
                 initialSelectedAppIds={selectedApps}
                 initialOrderedAppIds={orderedAppIds}
-                appsToDisplay={appsToDisplay} // Pass apps for PrioritySettings inside dialog
-                onSave={handleSaveSettings} // Pass the save handler
+                appsToDisplay={appsToDisplay} // ダイアログ内の PrioritySettings にアプリを渡す
+                onSave={handleSaveSettings} // 保存ハンドラを渡す
                 isSaving={isSaving}
-                isLoadingApps={isAllAppsLoading} // Pass app loading state
+                isLoadingApps={isAllAppsLoading} // アプリのローディング状態を渡す
                 isUserLoggedIn={!!user}
             />
          </div>
        </div>
-      {/* --- Header --- END --- */}
+      {/* --- ヘッダー --- 終了 --- */}
 
-      {/* --- App List Card (Add bottom margin) --- */}
+      {/* --- アプリリストカード (下マージン追加) --- */}
       <PaymentAppGrid
         apps={displayApps}
         orderedAppIds={orderedAppIds}
