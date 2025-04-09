@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../hooks/useAuth';
 import { useUserPaymentApps, useAllPaymentApps } from '../hooks/usePaymentApps';
 import PaymentAppCard from './PaymentAppCard';
+import CameraCapture from './CameraCapture';
 import { PaymentApp } from '../types';
 import { openPaymentApp, getAppLink, appLaunchState, didAppLaunch } from '../lib/deepLink';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +16,16 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle, CirclePlus, CreditCard, Settings } from 'lucide-react';
+import { CheckCircle, CirclePlus, CreditCard, Settings, Camera, Loader2 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { XCircle, ScanEye } from 'lucide-react';
+import PrioritySettings from './PrioritySettings';
+import { ListOrdered } from 'lucide-react';
+import { useQRCodeRecognition, RecognitionResult, RecognitionError } from '../../hooks/useQRCodeRecognition';
+import { AppSelector } from './AppSelector';
+import { PaymentAppGrid } from './PaymentAppGrid';
+import { SettingsDialog } from './SettingsDialog';
 
 // アプリごとのブランドカラーを設定 (塗りつぶしデザイン)
 function getBrandColor(app: PaymentApp) {
@@ -35,404 +44,363 @@ function getBrandColor(app: PaymentApp) {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { userPaymentApps, isLoading: isUserAppsLoading, updateUserPaymentApps } = useUserPaymentApps();
-  const { paymentApps, isLoading: isAllAppsLoading } = useAllPaymentApps();
+  const { userPaymentApps, isLoading: isUserAppsLoading, updateUserPaymentApps, isError: userPaymentAppsError } = useUserPaymentApps();
+  const { paymentApps, isLoading: isAllAppsLoading, isError: allAppsError } = useAllPaymentApps();
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // 未登録ユーザーにデフォルトの決済アプリを表示するためのstate
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [showAppSelector, setShowAppSelector] = useState(false);
+  const [orderedAppIds, setOrderedAppIds] = useState<string[]>([]);
+  const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   
-  useEffect(() => {
-    // ログイン済みで選択アプリがない場合、または未ログインでゲストモードの場合
-    if ((!loading && user && userPaymentApps.length === 0) || 
-        (!loading && !user && !localStorage.getItem('guestSelectedApps'))) {
-      setShowAppSelector(true);
+  // --- useQRCodeRecognition フックを使用 ---
+  const {
+    isRecognizing,
+    recognitionError,
+    startRecognition,
+    capturedImage,
+    setResultCallback,
+    setErrorCallback,
+  } = useQRCodeRecognition();
+  
+  // フックのコールバックによって識別されたサービスを保持する状態
+  const [identifiedServices, setIdentifiedServices] = useState<string[]>([]);
+
+  // --- 1. appsToDisplay を定義 ---
+  const appsToDisplay = useMemo(() => {
+    if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
+      return [...userPaymentApps]
+          .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+          .map(userApp => userApp.payment_app!)
+          .filter((app): app is PaymentApp => !!app);
+     }
+     else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
+        const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
+        const guestApps = selectedApps
+            .map(id => appMap.get(id))
+            .filter((app): app is PaymentApp => !!app);
+        return guestApps;
+     }
+     else {
+       return [];
+     }
+   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
+
+  // --- 認識成功時のコールバック ---
+  const handleRecognitionResult = useCallback((result: RecognitionResult) => {
+    console.log('[Dashboard] handleRecognitionResult received:', result); // ★ ログ
+    const uniqueServices = result.services ? [...new Set(result.services)] : [];
+    setIdentifiedServices(uniqueServices);
+
+    if (uniqueServices.length > 0) {
+      const userApps = appsToDisplay;
+      let appToLaunch: PaymentApp | null = null;
+      let foundMatch = false;
+
+      for (const app of userApps) {
+        const isMatch = uniqueServices.some((service: string) => {
+          const serviceLower = service?.toLowerCase() || '';
+          const appNameLower = app.name?.toLowerCase() || '';
+          return serviceLower === appNameLower;
+        });
+        if (isMatch) {
+          appToLaunch = app;
+          foundMatch = true;
+          break;
+        }
+      }
+
+      if (appToLaunch) {
+        toast.info(`${appToLaunch.name} (優先度最高) を起動します...`);
+        openPaymentApp(appToLaunch);
+      } else {
+        if (!foundMatch) {
+        } else {
+        }
+        toast.info('利用可能な登録済みアプリが見つかりませんでした。');
+      }
+    } else {
     }
-    
-    // ゲストモードの場合、ローカルストレージから選択済みアプリを取得
+  }, [appsToDisplay]);
+
+  // --- 認識エラー時のコールバック ---
+  const handleRecognitionError = useCallback((error: RecognitionError) => {
+    setIdentifiedServices([]);
+  }, []);
+
+  // --- フックにコールバックを登録 ---
+  useEffect(() => {
+    setResultCallback(handleRecognitionResult);
+  }, [setResultCallback, handleRecognitionResult]);
+
+  useEffect(() => {
+    setErrorCallback(handleRecognitionError);
+  }, [setErrorCallback, handleRecognitionError]);
+
+  // カメラダイアログを開く関数
+  const openCamera = () => {
+    console.log('[Dashboard] openCamera called. Resetting identifiedServices...'); // ★ ログ
+    // ★ スキャン開始前に必ず以前の結果をリセットする
+    setIdentifiedServices([]);
+    // capturedImage や recognitionError は useQRCodeRecognition フック側でリセットされる
+    setIsCameraDialogOpen(true); // 状態リセットの後にダイアログを開く
+  };
+
+  // <<< userPaymentApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
+  useEffect(() => {
+    if (user && userPaymentApps.length > 0) {
+      const initialOrderFromDB = [...userPaymentApps]
+        .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+        .map(upa => upa.payment_app_id);
+
+      if (JSON.stringify(initialOrderFromDB) !== JSON.stringify(orderedAppIds)) {
+          setOrderedAppIds(initialOrderFromDB);
+      }
+    } else if (!user) {
+    }
+  }, [user, userPaymentApps]);
+
+  // --- showAppSelector 用の既存の useEffect --- 開始 ---
+   useEffect(() => {
+    if ((!loading && user && userPaymentApps.length === 0 && !isUserAppsLoading) ||
+        (!loading && !user && !localStorage.getItem('guestSelectedApps'))) {
+       if (!isUserAppsLoading) {
+          setShowAppSelector(true);
+       }
+    }
+
     if (!loading && !user) {
       const savedApps = localStorage.getItem('guestSelectedApps');
       if (savedApps) {
-        setSelectedApps(JSON.parse(savedApps));
+        const parsedGuestApps = JSON.parse(savedApps);
+        if (JSON.stringify(parsedGuestApps) !== JSON.stringify(selectedApps)) {
+           setSelectedApps(parsedGuestApps);
+        }
       }
     }
-    
-    // ログイン済みの場合は、選択済みアプリを設定
+
     if (!loading && user && userPaymentApps.length > 0) {
-      setSelectedApps(userPaymentApps.map(app => app.payment_app_id));
+       const currentDbSelectedIds = userPaymentApps.map(app => app.payment_app_id);
+       if (JSON.stringify(currentDbSelectedIds) !== JSON.stringify(selectedApps)) {
+          setSelectedApps(currentDbSelectedIds);
+       }
+       setShowAppSelector(false);
     }
-  }, [loading, user, userPaymentApps]);
-  
-  // アプリ選択の切り替え
+  }, [loading, user, userPaymentApps, isUserAppsLoading]);
+  // --- showAppSelector 用の既存の useEffect --- 終了 ---
+
+  // --- toggleAppSelection --- 開始 ---
   const toggleAppSelection = (appId: string) => {
     setSelectedApps(prev => {
+      let newSelectedApps;
       if (prev.includes(appId)) {
-        return prev.filter(id => id !== appId);
+        newSelectedApps = prev.filter(id => id !== appId);
       } else {
-        return [...prev, appId];
+        newSelectedApps = [...prev, appId];
       }
+      if (!user) {
+        localStorage.setItem('guestSelectedApps', JSON.stringify(newSelectedApps));
+      }
+      return newSelectedApps;
     });
   };
-  
-  // 選択を確定
-  const confirmSelection = async () => {
+  // --- toggleAppSelection --- 終了 ---
+
+  // --- SettingsDialog からトリガーされる保存を処理するように confirmSelection を更新 --- 開始 ---
+  const handleSaveSettings = async (finalSelectionToSave: string[], finalOrderedIds: string[]) => {
     setIsSaving(true);
-    try {
-      await updateUserPaymentApps(selectedApps);
+    // console.log('[handleSaveSettings] Dashboardから設定を保存中...', { finalSelectionToSave, finalOrderedIds }); // ログ削除済み
+
+    if (!user) {
+      // console.log('[handleSaveSettings] ゲストユーザーとして保存中...'); // ログ削除済み
+      localStorage.setItem('guestSelectedApps', JSON.stringify(finalSelectionToSave));
+      setSelectedApps(finalSelectionToSave); // ローカル状態を更新
+      setOrderedAppIds(finalOrderedIds); // ローカルの順序状態を更新
       setShowAppSelector(false);
-      toast.success('決済アプリを保存しました');
-      setIsDialogOpen(false);
+      toast.success('設定を保存しました (ゲスト)');
+      setIsSettingsDialogOpen(false);
+      setIsSaving(false);
+      // console.log('[handleSaveSettings] ゲスト保存完了.'); // ログ削除済み
+      return;
+    }
+
+    try {
+      // console.log('[handleSaveSettings] ログインユーザーとして保存中...'); // ログ削除済み
+      // 最終的な選択を保存（ダイアログによって既に正しく順序付けられているはず）
+      await updateUserPaymentApps(finalSelectionToSave);
+      // 保存成功後にローカルの順序状態を更新
+      setOrderedAppIds(finalOrderedIds);
+      setShowAppSelector(false);
+      toast.success('決済アプリの設定を保存しました');
+      setIsSettingsDialogOpen(false);
+      // console.log('[handleSaveSettings] ログインユーザー保存API呼び出し完了.'); // ログ削除済み
     } catch (error) {
       console.error('Error saving app selection:', error);
-      toast.error('保存に失敗しました。もう一度お試しください。');
+      toast.error('設定の保存に失敗しました。');
     } finally {
       setIsSaving(false);
     }
   };
-  
-  // 表示するアプリリストを決定
-  const appsToDisplay = () => {
-    if (user && !isUserAppsLoading && userPaymentApps.length > 0) {
-      // ログイン済みで選択済みアプリがある場合
-      return userPaymentApps.map(userApp => userApp.payment_app!);
-    } else if (!user && !isUserAppsLoading && userPaymentApps.length > 0) {
-      // ゲストモードで選択済みアプリがある場合
-      return userPaymentApps.map(userApp => userApp.payment_app!);
-    } else {
-      // どちらでもない場合は空配列（アプリ選択画面を表示）
-      return [];
-    }
-  };
-  
-  if (loading || isAllAppsLoading) {
-    return (
-      <div className="space-y-4">
+  // --- 更新された confirmSelection --- 終了 ---
+
+  // --- ローディング状態 --- 開始 ---
+  if (loading || (isAllAppsLoading && showAppSelector)) {
+     return (
+      <div className="space-y-4 p-4">
         <div className="flex justify-between items-center">
           <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-24" />
         </div>
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-32" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
           </CardContent>
         </Card>
       </div>
     );
   }
-  
+  // --- ローディング状態 --- END ---
+
+  // --- アプリ選択UI --- 開始 ---
   if (showAppSelector) {
     return (
-      <div className="space-y-6">
-        <Card className="backdrop-blur-sm transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-2xl">利用するQR決済アプリを選択</CardTitle>
-            <CardDescription>
-              利用したいQR決済アプリを選択してください。後から設定画面で変更することもできます。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {paymentApps.map((app: PaymentApp) => (
-                <div
-                  key={app.id}
-                  className={`relative p-4 border rounded-xl cursor-pointer transition-all duration-200 transform hover:scale-105 ${
-                    selectedApps.includes(app.id)
-                      ? 'border-primary bg-primary/5 shadow-md'
-                      : 'border-muted hover:border-primary/50'
-                  }`}
-                  onClick={() => toggleAppSelection(app.id)}
-                >
-                  {selectedApps.includes(app.id) && (
-                    <div className="absolute top-2 right-2 z-10">
-                      <CheckCircle className="h-5 w-5 text-primary" />
-                    </div>
-                  )}
-                  <div className="flex flex-col items-center text-center">
-                    {app.logo_url ? (
-                      <div className="w-16 h-16 relative mb-3 p-2">
-                        <div className="w-full h-full relative rounded-lg overflow-hidden">
-                          <Image
-                            src={app.logo_url}
-                            alt={app.name}
-                            width={64}
-                            height={64}
-                            style={{
-                              objectFit: 'contain',
-                              width: '100%',
-                              height: '100%'
-                            }}
-                            className="transition-all duration-200"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mb-3 shadow-sm">
-                        <span className="text-gray-500 text-xl font-bold">
-                          {app.name.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                    <span className="text-sm font-medium">{app.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-          <CardFooter className="justify-between">
-            <div className="text-sm text-muted-foreground">
-              {selectedApps.length} アプリを選択中
-            </div>
-            <Button
-              onClick={confirmSelection}
-              disabled={selectedApps.length === 0 || isSaving}
-              className="relative"
-            >
-              {isSaving ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  保存中...
-                </span>
-              ) : (
-                <span className="flex items-center gap-1">
-                  選択を確定
-                  <CheckCircle className="h-4 w-4 ml-1" />
-                </span>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+        <AppSelector
+            allPaymentApps={paymentApps || []}
+            selectedAppIds={selectedApps}
+            onSelectionChange={toggleAppSelection}
+            onConfirm={() => {
+                setShowAppSelector(false);
+            }}
+            isSaving={isSaving}
+            isLoading={isAllAppsLoading}
+        />
     );
   }
-  
-  const displayApps = appsToDisplay();
-  
+  // --- アプリ選択UI --- 終了 ---
+
+  // --- レンダリング用データ導出 --- 開始 ---
+  const displayApps = appsToDisplay;
+  const highlightedAppNames = new Set(identifiedServices);
+  const selectedAppDetails = (paymentApps || [])
+      .filter((app: PaymentApp) => selectedApps.includes(app.id));
+  // --- レンダリング用データ導出 --- 終了 ---
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-6 pb-24">
       <Toaster position="top-center" richColors />
-      
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">QR決済アプリ</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">編集</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>決済アプリの設定</DialogTitle>
-              <DialogDescription>
-                利用したいQR決済アプリを選択してください。
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4">
-              {paymentApps.map((app: PaymentApp) => (
-                <div
-                  key={app.id}
-                  className={`relative p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedApps.includes(app.id)
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted hover:border-primary/30'
-                  }`}
-                  onClick={() => toggleAppSelection(app.id)}
-                >
-                  {selectedApps.includes(app.id) && (
-                    <div className="absolute top-1 right-1 z-10">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                    </div>
-                  )}
-                  <div className="flex flex-col items-center text-center">
-                    {app.logo_url ? (
-                      <div className="w-12 h-12 relative mb-2">
-                        <Image
-                          src={app.logo_url}
-                          alt={app.name}
-                          width={48}
-                          height={48}
-                          className="object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-2">
-                        <span className="text-muted-foreground text-lg font-bold">
-                          {app.name.charAt(0)}
-                        </span>
-                      </div>
+
+      {/* --- ヘッダー --- 開始 --- */}
+       <div className="flex justify-between items-center gap-2">
+         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">QR決済アプリ</h1>
+         <div className="flex items-center gap-2">
+            {/* --- カメラダイアログ --- 開始 --- */}
+            <Dialog open={isCameraDialogOpen} onOpenChange={setIsCameraDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Camera className="h-4 w-4" />
+                    <span className="hidden sm:inline">スキャン</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>カメラで決済サービスを認識</DialogTitle>
+                    <DialogDescription>
+                      お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <CameraCapture
+                      onCapture={startRecognition}
+                      onError={(msg) => { /* エラーはフックのコールバックで処理される */ }}
+                      isProcessing={isRecognizing}
+                    />
+
+                    {/* --- 認識されたサービスセクション (移動してきた) --- */}
+                    {(isRecognizing || identifiedServices.length > 0 || recognitionError !== null) && (
+                      <Card className="shadow-sm mt-4"> {/* 少し上にマージンを追加 */} 
+                        {/* カードヘッダーはダイアログにあるので削除しても良いかも？ */}
+                        {/* <CardHeader>
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <ScanEye className="mr-2 h-5 w-5" />
+                            お店で使える決済サービス (スキャン結果)
+                          </CardTitle>
+                        </CardHeader> */}
+                        <CardContent className="pt-4"> {/* ヘッダー削除に伴いptを追加 */} 
+                          {isRecognizing ? (
+                            <div className="flex items-center justify-center py-4 text-muted-foreground">
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              認識中...
+                            </div>
+                          ) : recognitionError ? (
+                            <Alert variant="destructive" className="mt-0">
+                              <XCircle className="h-4 w-4" />
+                              <AlertTitle>認識エラー</AlertTitle>
+                              <AlertDescription>{recognitionError.message}</AlertDescription>
+                            </Alert>
+                          ) : identifiedServices.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {identifiedServices.map(serviceName => (
+                                <Badge key={serviceName} variant="secondary" className="text-sm">
+                                  {serviceName}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              対応する決済サービスが見つかりませんでした。
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
                     )}
-                    <span className="text-xs font-medium">{app.name}</span>
                   </div>
-                </div>
-              ))}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                キャンセル
-              </Button>
-              <Button 
-                onClick={confirmSelection}
-                disabled={selectedApps.length === 0 || isSaving}
-              >
-                {isSaving ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    保存中...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    保存
-                    <CheckCircle className="h-4 w-4 ml-1" />
-                  </span>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-      
-      <Tabs defaultValue="grid" className="w-full">
-        <div className="flex items-center justify-between mb-4">
-          <TabsList className="grid w-[200px] grid-cols-2">
-            <TabsTrigger value="grid">グリッド</TabsTrigger>
-            <TabsTrigger value="list">リスト</TabsTrigger>
-          </TabsList>
-          <Badge variant="outline" className="gap-1">
-            <CreditCard className="h-3.5 w-3.5" />
-            {displayApps.length} アプリ
-          </Badge>
-        </div>
-        
-        <TabsContent value="grid" className="mt-0">
-          {displayApps.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {displayApps.map(app => (
-                <PaymentAppCard key={app.id} app={app} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState setShowAppSelector={setShowAppSelector} />
-          )}
-        </TabsContent>
-        
-        <TabsContent value="list" className="mt-0">
-          {displayApps.length > 0 ? (
-            <Card>
-              <CardContent className="p-0">
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {displayApps.map(app => (
-                    <PaymentAppCardAppleStyle key={app.id} app={app} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <EmptyState setShowAppSelector={setShowAppSelector} />
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
+                   <DialogFooter>
+                     <Button variant="outline" onClick={() => setIsCameraDialogOpen(false)}>閉じる</Button>
+                   </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* --- カメラダイアログ --- 終了 --- */}
 
-// 空の状態表示コンポーネント
-function EmptyState({ setShowAppSelector }: { setShowAppSelector: (show: boolean) => void }) {
-  return (
-    <Card className="w-full">
-      <CardContent className="flex flex-col items-center justify-center py-12">
-        <div className="rounded-full bg-muted p-3 mb-4">
-          <CirclePlus className="h-10 w-10 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-2">表示するQR決済アプリがありません</h3>
-        <p className="text-muted-foreground text-center max-w-md mb-6">
-          アプリを選択することで、すぐにQR決済を利用できるようになります。
-        </p>
-        <Button onClick={() => setShowAppSelector(true)}>
-          アプリを選択する
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
+            {/* --- 設定ダイアログトリガー (ここでは完全なダイアログではない) --- 開始 --- */}
+             <Button variant="outline" size="sm" className="gap-1" onClick={() => setIsSettingsDialogOpen(true)}>
+               <Settings className="h-4 w-4" />
+               <span className="hidden sm:inline">編集</span>
+             </Button>
+            {/* --- 設定ダイアログトリガー --- 終了 --- */}
 
-// シンプルなApple風カードスタイルのPaymentAppCard
-function PaymentAppCardAppleStyle({ app }: { app: PaymentApp }) {
-  const isPC = typeof window !== 'undefined' && !(/android|iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()));
-  
-  const handleClick = () => {
-    if (isPC) {
-      // PCの場合はウェブURLを新しいタブで開く
-      window.open(app.web_url, '_blank');
-    } else {
-      // アプリを開く - インストールされていなければ反応なし
-      openPaymentApp(app);
-    }
-  };
-  
-  const brandColors = getBrandColor(app);
-  
-  return (
-    <div className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-      <Button
-        variant="ghost"
-        onClick={handleClick}
-        className="w-full h-auto p-3 flex justify-between items-center rounded-none text-foreground hover:bg-transparent active:scale-[0.98] transition-transform"
-      >
-        <div className="flex items-center">
-          {app.logo_url ? (
-            <div className="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
-              <Image
-                src={app.logo_url}
-                alt={app.name}
-                width={40}
-                height={40}
-                className="object-contain p-1"
-              />
-            </div>
-          ) : (
-            <div className="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
-              <span className="text-xl font-bold text-muted-foreground">
-                {app.name.charAt(0)}
-              </span>
-            </div>
-          )}
-          <div className="flex flex-col items-start">
-            <span className="font-medium group-hover:text-primary transition-colors">{app.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {isPC ? "クリックして公式サイトを開く" : "タップして開く"}
-            </span>
-            {app.api_available && (
-              <span className="text-xs text-green-600 dark:text-green-400">API連携可能</span>
-            )}
-          </div>
-        </div>
-        
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" 
-          viewBox="0 0 20 20" 
-          fill="currentColor"
-        >
-          <path 
-            fillRule="evenodd" 
-            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" 
-            clipRule="evenodd" 
-          />
-        </svg>
-      </Button>
+            {/* --- SettingsDialogをレンダリング (状態によって制御) --- */}
+            <SettingsDialog
+                isOpen={isSettingsDialogOpen}
+                onOpenChange={setIsSettingsDialogOpen}
+                allPaymentApps={paymentApps || []}
+                initialSelectedAppIds={selectedApps}
+                initialOrderedAppIds={orderedAppIds}
+                appsToDisplay={appsToDisplay} // ダイアログ内の PrioritySettings にアプリを渡す
+                onSave={handleSaveSettings} // 保存ハンドラを渡す
+                isSaving={isSaving}
+                isLoadingApps={isAllAppsLoading} // アプリのローディング状態を渡す
+                isUserLoggedIn={!!user}
+            />
+         </div>
+       </div>
+      {/* --- ヘッダー --- 終了 --- */}
+
+      {/* --- アプリリストカード (下マージン追加) --- */}
+      <PaymentAppGrid
+        apps={displayApps}
+        orderedAppIds={orderedAppIds}
+        onAppClick={(app) => {
+          toast.info(`${app.name} を起動します...`);
+          openPaymentApp(app);
+        }}
+        getBrandColor={getBrandColor}
+      />
+
     </div>
   );
 } 
