@@ -162,14 +162,14 @@ export default function Dashboard() {
   // --- showAppSelector 用の既存の useEffect --- 開始 ---
    useEffect(() => {
     if ((!loading && user && userPointApps.length === 0 && !isUserAppsLoading) ||
-        (!loading && !user && !localStorage.getItem('guestSelectedApps'))) {
+        (!loading && !user && !localStorage.getItem('guestSelectedPointApps'))) {
        if (!isUserAppsLoading) {
           setShowAppSelector(true);
        }
     }
 
     if (!loading && !user) {
-      const savedApps = localStorage.getItem('guestSelectedApps');
+      const savedApps = localStorage.getItem('guestSelectedPointApps');
       if (savedApps) {
         const parsedGuestApps = JSON.parse(savedApps);
         if (JSON.stringify(parsedGuestApps) !== JSON.stringify(selectedApps)) {
@@ -198,7 +198,7 @@ export default function Dashboard() {
         newSelectedApps = [...prev, appId];
       }
       if (!user) {
-        localStorage.setItem('guestSelectedApps', JSON.stringify(newSelectedApps));
+        localStorage.setItem('guestSelectedPointApps', JSON.stringify(newSelectedApps));
       }
       return newSelectedApps;
     });
@@ -212,7 +212,7 @@ export default function Dashboard() {
 
     if (!user) {
       // console.log('[handleSaveSettings] ゲストユーザーとして保存中...'); // ログ削除済み
-      localStorage.setItem('guestSelectedApps', JSON.stringify(finalSelectionToSave));
+      localStorage.setItem('guestSelectedPointApps', JSON.stringify(finalSelectionToSave));
       setSelectedApps(finalSelectionToSave); // ローカル状態を更新
       setOrderedAppIds(finalOrderedIds); // ローカルの順序状態を更新
       setShowAppSelector(false);
@@ -287,6 +287,16 @@ export default function Dashboard() {
   const highlightedAppNames = new Set(identifiedServices);
   const selectedAppDetails = (paymentApps || [])
       .filter((app: PointApp) => selectedApps.includes(app.id));
+      
+  // PointAppGridに渡すためにUserPointApp形式に変換
+  const displayUserApps = displayApps.map((app, index) => ({
+    id: `display-${app.id}`,
+    user_id: user?.id || 'guest',
+    point_app_id: app.id,
+    point_app: app,
+    priority: index,
+    is_active: true
+  }));
   // --- レンダリング用データ導出 --- 終了 ---
 
   return (
@@ -391,7 +401,7 @@ export default function Dashboard() {
 
       {/* --- アプリリストカード (下マージン追加) --- */}
       <PointAppGrid
-        apps={userPointApps}
+        apps={displayUserApps}
         isLoading={isUserAppsLoading}
       />
 
