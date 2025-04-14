@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../hooks/useAuth';
-import { useUserPaymentApps, useAllPaymentApps } from '../hooks/usePaymentApps';
-import PaymentAppCard from './PaymentAppCard';
+import { useUserPointApps, useAllPointApps } from '../hooks/usePointApps';
+import PointAppCard from './PointAppCard';
 import CameraCapture from './CameraCapture';
-import { PaymentApp } from '../types';
+import { PointApp } from '../types';
 import { openPaymentApp, getAppLink, appLaunchState, didAppLaunch } from '../lib/deepLink';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,18 +24,17 @@ import PrioritySettings from './PrioritySettings';
 import { ListOrdered } from 'lucide-react';
 import { useQRCodeRecognition, RecognitionResult, RecognitionError } from '../hooks/useQRCodeRecognition';
 import { AppSelector } from './AppSelector';
-import { PaymentAppGrid } from './PaymentAppGrid';
+import PointAppGrid from './PointAppGrid';
 import { SettingsDialog } from './SettingsDialog';
 
 // アプリごとのブランドカラーを設定 (塗りつぶしデザイン)
-function getBrandColor(app: PaymentApp) {
+function getBrandColor(app: PointApp) {
   const colors: Record<string, { bg: string, text: string, hover: string }> = {
-    'PayPay': { bg: 'bg-red-500', text: 'text-white', hover: 'hover:bg-red-600' },
-    'LINE Pay': { bg: 'bg-green-500', text: 'text-white', hover: 'hover:bg-green-600' },
-    '楽天ペイ': { bg: 'bg-red-600', text: 'text-white', hover: 'hover:bg-red-700' },
-    'd払い': { bg: 'bg-pink-500', text: 'text-white', hover: 'hover:bg-pink-600' },
-    'au PAY': { bg: 'bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-600' },
-    'メルペイ': { bg: 'bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-600' },
+    'Vポイント': { bg: 'bg-red-500', text: 'text-white', hover: 'hover:bg-red-600' },
+    '楽天ポイント': { bg: 'bg-red-600', text: 'text-white', hover: 'hover:bg-red-700' },
+    'dポイント': { bg: 'bg-pink-500', text: 'text-white', hover: 'hover:bg-pink-600' },
+    'Ponta': { bg: 'bg-orange-500', text: 'text-white', hover: 'hover:bg-orange-600' },
+    'PayPayポイント': { bg: 'bg-blue-500', text: 'text-white', hover: 'hover:bg-blue-600' },
   };
   
   return colors[app.name] || { bg: 'bg-gray-500', text: 'text-white', hover: 'hover:bg-gray-600' };
@@ -44,8 +43,8 @@ function getBrandColor(app: PaymentApp) {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { userPaymentApps, isLoading: isUserAppsLoading, updateUserPaymentApps, isError: userPaymentAppsError } = useUserPaymentApps();
-  const { paymentApps, isLoading: isAllAppsLoading, isError: allAppsError } = useAllPaymentApps();
+  const { userPointApps, isLoading: isUserAppsLoading, updateUserPointApps, isError: userPointAppsError } = useUserPointApps();
+  const { pointApps: paymentApps, isLoading: isAllAppsLoading, isError: allAppsError } = useAllPointApps();
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -68,23 +67,23 @@ export default function Dashboard() {
 
   // --- 1. appsToDisplay を定義 ---
   const appsToDisplay = useMemo(() => {
-    if (user && !isUserAppsLoading && userPaymentApps && userPaymentApps.length > 0) {
-      return [...userPaymentApps]
+    if (user && !isUserAppsLoading && userPointApps && userPointApps.length > 0) {
+      return [...userPointApps]
           .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
-          .map(userApp => userApp.payment_app!)
-          .filter((app): app is PaymentApp => !!app);
+          .map(userApp => userApp.point_app!)
+          .filter((app): app is PointApp => !!app);
      }
      else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
-        const appMap = new Map(paymentApps.map((app: PaymentApp) => [app.id, app]));
+        const appMap = new Map(paymentApps.map((app: PointApp) => [app.id, app]));
         const guestApps = selectedApps
             .map(id => appMap.get(id))
-            .filter((app): app is PaymentApp => !!app);
+            .filter((app): app is PointApp => !!app);
         return guestApps;
      }
      else {
        return [];
      }
-   }, [user, isUserAppsLoading, userPaymentApps, selectedApps, paymentApps]);
+   }, [user, isUserAppsLoading, userPointApps, selectedApps, paymentApps]);
 
   // --- 認識成功時のコールバック ---
   const handleRecognitionResult = useCallback((result: RecognitionResult) => {
@@ -94,7 +93,7 @@ export default function Dashboard() {
 
     if (uniqueServices.length > 0) {
       const userApps = appsToDisplay;
-      let appToLaunch: PaymentApp | null = null;
+      let appToLaunch: PointApp | null = null;
       let foundMatch = false;
 
       for (const app of userApps) {
@@ -146,23 +145,23 @@ export default function Dashboard() {
     setIsCameraDialogOpen(true); // 状態リセットの後にダイアログを開く
   };
 
-  // <<< userPaymentApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
+  // <<< userPointApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
   useEffect(() => {
-    if (user && userPaymentApps.length > 0) {
-      const initialOrderFromDB = [...userPaymentApps]
+    if (user && userPointApps.length > 0) {
+      const initialOrderFromDB = [...userPointApps]
         .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
-        .map(upa => upa.payment_app_id);
+        .map(upa => upa.point_app_id);
 
       if (JSON.stringify(initialOrderFromDB) !== JSON.stringify(orderedAppIds)) {
           setOrderedAppIds(initialOrderFromDB);
       }
     } else if (!user) {
     }
-  }, [user, userPaymentApps]);
+  }, [user, userPointApps]);
 
   // --- showAppSelector 用の既存の useEffect --- 開始 ---
    useEffect(() => {
-    if ((!loading && user && userPaymentApps.length === 0 && !isUserAppsLoading) ||
+    if ((!loading && user && userPointApps.length === 0 && !isUserAppsLoading) ||
         (!loading && !user && !localStorage.getItem('guestSelectedApps'))) {
        if (!isUserAppsLoading) {
           setShowAppSelector(true);
@@ -179,14 +178,14 @@ export default function Dashboard() {
       }
     }
 
-    if (!loading && user && userPaymentApps.length > 0) {
-       const currentDbSelectedIds = userPaymentApps.map(app => app.payment_app_id);
+    if (!loading && user && userPointApps.length > 0) {
+       const currentDbSelectedIds = userPointApps.map(app => app.point_app_id);
        if (JSON.stringify(currentDbSelectedIds) !== JSON.stringify(selectedApps)) {
           setSelectedApps(currentDbSelectedIds);
        }
        setShowAppSelector(false);
     }
-  }, [loading, user, userPaymentApps, isUserAppsLoading]);
+  }, [loading, user, userPointApps, isUserAppsLoading]);
   // --- showAppSelector 用の既存の useEffect --- 終了 ---
 
   // --- toggleAppSelection --- 開始 ---
@@ -227,7 +226,7 @@ export default function Dashboard() {
     try {
       // console.log('[handleSaveSettings] ログインユーザーとして保存中...'); // ログ削除済み
       // 最終的な選択を保存（ダイアログによって既に正しく順序付けられているはず）
-      await updateUserPaymentApps(finalSelectionToSave);
+      await updateUserPointApps(finalSelectionToSave);
       // 保存成功後にローカルの順序状態を更新
       setOrderedAppIds(finalOrderedIds);
       setShowAppSelector(false);
@@ -287,7 +286,7 @@ export default function Dashboard() {
   const displayApps = appsToDisplay;
   const highlightedAppNames = new Set(identifiedServices);
   const selectedAppDetails = (paymentApps || [])
-      .filter((app: PaymentApp) => selectedApps.includes(app.id));
+      .filter((app: PointApp) => selectedApps.includes(app.id));
   // --- レンダリング用データ導出 --- 終了 ---
 
   return (
@@ -296,7 +295,7 @@ export default function Dashboard() {
 
       {/* --- ヘッダー --- 開始 --- */}
        <div className="flex justify-between items-center gap-2">
-         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">QR決済アプリ</h1>
+         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">ポイントアプリHub</h1>
          <div className="flex items-center gap-2">
             {/* --- カメラダイアログ --- 開始 --- */}
             <Dialog open={isCameraDialogOpen} onOpenChange={setIsCameraDialogOpen}>
@@ -380,10 +379,10 @@ export default function Dashboard() {
                 allPaymentApps={paymentApps || []}
                 initialSelectedAppIds={selectedApps}
                 initialOrderedAppIds={orderedAppIds}
-                appsToDisplay={appsToDisplay} // ダイアログ内の PrioritySettings にアプリを渡す
-                onSave={handleSaveSettings} // 保存ハンドラを渡す
+                appsToDisplay={displayApps}
+                onSave={handleSaveSettings}
                 isSaving={isSaving}
-                isLoadingApps={isAllAppsLoading} // アプリのローディング状態を渡す
+                isLoadingApps={isUserAppsLoading || isAllAppsLoading}
                 isUserLoggedIn={!!user}
             />
          </div>
@@ -391,14 +390,9 @@ export default function Dashboard() {
       {/* --- ヘッダー --- 終了 --- */}
 
       {/* --- アプリリストカード (下マージン追加) --- */}
-      <PaymentAppGrid
-        apps={displayApps}
-        orderedAppIds={orderedAppIds}
-        onAppClick={(app) => {
-          toast.info(`${app.name} を起動します...`);
-          openPaymentApp(app);
-        }}
-        getBrandColor={getBrandColor}
+      <PointAppGrid
+        apps={userPointApps}
+        isLoading={isUserAppsLoading}
       />
 
     </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { PaymentApp } from '../types';
+import { PointApp } from '../types';
 import PrioritySettings from './PrioritySettings';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,12 +11,12 @@ import { CheckCircle, CirclePlus, ListOrdered } from 'lucide-react';
 
 interface SettingsDialogProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  allPaymentApps: PaymentApp[];
+  onOpenChange: (open: boolean) => void;
+  allPaymentApps: PointApp[];
   initialSelectedAppIds: string[];
   initialOrderedAppIds: string[];
-  appsToDisplay: PaymentApp[]; // For PrioritySettings
-  onSave: (selectedIds: string[], orderedIds: string[]) => Promise<void>; // Callback to handle saving
+  appsToDisplay: PointApp[];
+  onSave: (finalSelectionToSave: string[], finalOrderedIds: string[]) => Promise<void>;
   isSaving: boolean;
   isLoadingApps: boolean;
   isUserLoggedIn: boolean;
@@ -96,7 +96,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </DialogDescription>
               {/* App Selection Grid */} 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4 max-h-60 overflow-y-auto pr-2">
-                {(allPaymentApps || []).map((app: PaymentApp) => (
+                {(allPaymentApps || []).map((app: PointApp) => (
                   <div
                     key={app.id}
                     className={`relative p-3 border rounded-lg cursor-pointer transition-all duration-200 ${selectedIds.includes(app.id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/30'}`}

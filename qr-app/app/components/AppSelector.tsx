@@ -2,14 +2,14 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { PaymentApp } from '../types';
+import { PointApp } from '../types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, CirclePlus } from 'lucide-react';
 
 interface AppSelectorProps {
-  allPaymentApps: PaymentApp[];
+  allPaymentApps: PointApp[];
   selectedAppIds: string[];
   onSelectionChange: (appId: string) => void;
   onConfirm: () => void;
@@ -53,35 +53,61 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
 
   return (
     <Card className="w-full max-w-2xl mx-auto mt-8">
-      <CardHeader>
-        <CardTitle>利用する決済アプリを選択</CardTitle>
-        <CardDescription>
-          よく使う決済アプリを選んでください。後から変更できます。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {(allPaymentApps || []).map((app: PaymentApp) => (
-          <div key={app.id} className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Image src={app.logo_url || '/placeholder.png'} alt={app.name} width={32} height={32} className="rounded-md" />
-              <span>{app.name}</span>
-            </div>
-            <Button
-              variant={selectedAppIds.includes(app.id) ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onSelectionChange(app.id)}
+        <CardHeader>
+            <CardTitle>ポイントアプリの選択</CardTitle>
+            <CardDescription>
+                利用したいポイントアプリを選択してください
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            {allPaymentApps.map((app) => (
+                <div key={app.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        {app.logo_url ? (
+                            <Image 
+                                src={app.logo_url} 
+                                alt={app.name} 
+                                width={32} 
+                                height={32} 
+                                className="rounded-md"
+                            />
+                        ) : (
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                                    {app.name.charAt(0)}
+                                </span>
+                            </div>
+                        )}
+                        <span className="font-medium">{app.name}</span>
+                    </div>
+                    <Button
+                        variant={selectedAppIds.includes(app.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => onSelectionChange(app.id)}
+                    >
+                        {selectedAppIds.includes(app.id) ? (
+                            <>
+                                <CheckCircle className="mr-1 h-4 w-4" />
+                                選択中
+                            </>
+                        ) : (
+                            <>
+                                <CirclePlus className="mr-1 h-4 w-4" />
+                                選択する
+                            </>
+                        )}
+                    </Button>
+                </div>
+            ))}
+        </CardContent>
+        <CardFooter className="justify-end">
+            <Button 
+                onClick={onConfirm}
+                disabled={isSaving || selectedAppIds.length === 0}
             >
-              {selectedAppIds.includes(app.id) ? <CheckCircle className="mr-2 h-4 w-4" /> : <CirclePlus className="mr-2 h-4 w-4" />}
-              {selectedAppIds.includes(app.id) ? '選択中' : '追加'}
+                {isSaving ? '保存中...' : '完了'}
             </Button>
-          </div>
-        ))}
-      </CardContent>
-      <CardFooter className="justify-end">
-        <Button onClick={onConfirm} disabled={isSaving || selectedAppIds.length === 0}>
-          {isSaving ? '保存中...' : '選択を確定'}
-        </Button>
-      </CardFooter>
+        </CardFooter>
     </Card>
   );
 }; 

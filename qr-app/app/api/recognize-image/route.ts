@@ -70,11 +70,11 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = `
-      この画像に写っているQRコード決済サービスのロゴを特定し、その正式名称のリストだけをJSON配列形式で返してください。
-      例: ["PayPay", "楽天ペイ", "d払い"]
-      ロゴが見つからない場合や、QRコード決済サービス以外のロゴの場合は、空の配列 [] を返してください。
+      この画像に写っているポイントカードやポイントサービスのロゴを特定し、その正式名称のリストだけをJSON配列形式で返してください。
+      例: ["Vポイント", "楽天ポイント", "dポイント"]
+      ロゴが見つからない場合や、ポイントサービス以外のロゴの場合は、空の配列 [] を返してください。
       余計な説明や前置きは不要です。JSON配列のみを返してください。
-      認識可能なサービス例: PayPay, LINE Pay, 楽天ペイ, d払い, au PAY, メルペイ
+      認識可能なサービス例: Vポイント, 楽天ポイント, dポイント, Ponta, PayPayポイント
     `;
 
     console.log("Calling Gemini API with imagePart:", imagePart ? "Exists" : "Null"); // API呼び出し前に imagePart を確認
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string')) {
          console.error("Parsed response is not a valid JSON array of strings:", parsed);
          // フォールバック: 最終手段として、元の生のテキストを正規表現抽出に使用する
-         const extracted = text.match(/(PayPay|LINE Pay|楽天ペイ|d払い|au PAY|メルペイ)/g);
+         const extracted = text.match(/(Vポイント|楽天ポイント|dポイント|Ponta|PayPayポイント)/g);
          serviceNames = extracted || [];
          console.log("Fallback regex extraction result (invalid array):", serviceNames);
       } else {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.error("Failed to parse Gemini response as JSON even after cleaning:", text, parseError);
        // フォールバック: 元の生のテキストを正規表現抽出に使用する
-       const extracted = text.match(/(PayPay|LINE Pay|楽天ペイ|d払い|au PAY|メルペイ)/g);
+       const extracted = text.match(/(Vポイント|楽天ポイント|dポイント|Ponta|PayPayポイント)/g);
        serviceNames = extracted || [];
        console.log("Fallback regex extraction result (parse error):", serviceNames);
     }
