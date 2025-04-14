@@ -108,7 +108,7 @@ export function useUserPaymentApps(): UseUserPaymentAppsResult {
 
       // 3. 不要になったアプリを特定して削除
       const newAppIdsSet = new Set(orderedAppIds);
-      const appsToDelete = Array.from(currentAppIds).filter((id: string) => !newAppIdsSet.has(id));
+      const appsToDelete = Array.from(currentAppIds as Set<string>).filter((id) => !newAppIdsSet.has(id));
 
       // --- 操作を実行 (理想的にはトランザクション内だが、Supabase JS クライアントは直接サポートしていない) ---
       // 3a. 選択されなくなったアプリを削除
