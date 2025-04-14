@@ -27,10 +27,10 @@ export default function Layout({ children }: LayoutProps) {
       <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <h2 className="text-center text-3xl font-bold text-foreground">
-            QR決済アプリHub
+            ポイントアプリHub
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            あなた専用のQRコード決済プラットフォーム
+            あなた専用のポイントカード管理プラットフォーム
           </p>
         </div>
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -53,7 +53,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between w-full">
             <div className="flex gap-6 md:gap-10">
               <Link href="/" className="flex items-center space-x-2">
-                <span className="inline-block font-bold text-xl">QR決済アプリHub</span>
+                <span className="inline-block font-bold text-xl">ポイントアプリHub</span>
               </Link>
               
               <nav className="hidden md:flex gap-6">
@@ -181,7 +181,7 @@ export default function Layout({ children }: LayoutProps) {
       <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container py-6 text-center">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} QR決済アプリHub. All rights reserved.
+            &copy; {new Date().getFullYear()} ポイントアプリHub. All rights reserved.
           </p>
         </div>
       </footer>

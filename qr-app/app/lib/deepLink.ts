@@ -1,4 +1,4 @@
-import { PaymentApp } from '../types/index';
+import { PaymentApp, PointApp } from '../types/index';
 
 // アプリ起動の状態を管理するオブジェクト（グローバルな状態）
 export const appLaunchState = {
@@ -38,7 +38,7 @@ export const appLaunchState = {
 };
 
 // デバイスタイプに応じてURLを生成する関数
-export function getAppLink(app: PaymentApp): string {
+export function getAppLink(app: PaymentApp | PointApp): string {
   // クライアントサイドでのみ実行されるようにする
   if (typeof window === 'undefined') return app.web_url;
   
@@ -58,7 +58,7 @@ export function getAppLink(app: PaymentApp): string {
 }
 
 // ストアURLを取得する関数（明示的に使用する場合のみ）
-export function getStoreLink(app: PaymentApp): string | null {
+export function getStoreLink(app: PaymentApp | PointApp): string | null {
   if (typeof window === 'undefined') return null;
   
   const userAgent = navigator.userAgent.toLowerCase();
@@ -73,7 +73,7 @@ export function getStoreLink(app: PaymentApp): string | null {
 }
 
 // アプリを開く関数 - インストールされていない場合は反応しない
-export function openPaymentApp(app: PaymentApp): void {
+export function openPaymentApp(app: PaymentApp | PointApp): void {
   if (typeof window === 'undefined') return;
   
   const link = getAppLink(app);
@@ -123,7 +123,7 @@ export function didAppLaunch(appId: string): boolean {
 }
 
 // アプリが起動していない場合のみ、ストアを開く関数
-export function openAppStoreIfNeeded(app: PaymentApp): boolean {
+export function openAppStoreIfNeeded(app: PaymentApp | PointApp): boolean {
   // アプリが起動していなければストアを開く
   if (!didAppLaunch(app.id)) {
     openAppStore(app);
@@ -133,7 +133,7 @@ export function openAppStoreIfNeeded(app: PaymentApp): boolean {
 }
 
 // ストアを明示的に開くための関数（別途UIから呼び出す場合用）
-export function openAppStore(app: PaymentApp): void {
+export function openAppStore(app: PaymentApp | PointApp): void {
   const storeUrl = getStoreLink(app);
   if (storeUrl) {
     window.location.href = storeUrl;

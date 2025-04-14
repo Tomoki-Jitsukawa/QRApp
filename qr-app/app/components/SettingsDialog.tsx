@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { PaymentApp } from '../types';
+import { PointApp } from '../types';
 import PrioritySettings from './PrioritySettings';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,12 +11,12 @@ import { CheckCircle, CirclePlus, ListOrdered } from 'lucide-react';
 
 interface SettingsDialogProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  allPaymentApps: PaymentApp[];
+  onOpenChange: (open: boolean) => void;
+  allPaymentApps: PointApp[];
   initialSelectedAppIds: string[];
   initialOrderedAppIds: string[];
-  appsToDisplay: PaymentApp[]; // For PrioritySettings
-  onSave: (selectedIds: string[], orderedIds: string[]) => Promise<void>; // Callback to handle saving
+  appsToDisplay: PointApp[];
+  onSave: (finalSelectionToSave: string[], finalOrderedIds: string[]) => Promise<void>;
   isSaving: boolean;
   isLoadingApps: boolean;
   isUserLoggedIn: boolean;
@@ -36,15 +36,41 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedAppIds);
   const [orderedIds, setOrderedIds] = useState<string[]>(initialOrderedAppIds);
+  const [activeTab, setActiveTab] = useState<string>("select");
 
   // Reset state when initial props change (e.g., when dialog reopens after save)
   useEffect(() => {
+    console.log('Settings dialog: updating selected IDs with', initialSelectedAppIds);
     setSelectedIds(initialSelectedAppIds);
   }, [initialSelectedAppIds]);
 
   useEffect(() => {
+    console.log('Settings dialog: updating ordered IDs with', initialOrderedAppIds);
     setOrderedIds(initialOrderedAppIds);
   }, [initialOrderedAppIds]);
+
+  // タブが変更されたときの処理
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // 順序タブに切り替えたとき、現在の選択状態と順序に基づいて順序を再設定
+    if (value === "order") {
+      console.log('Settings dialog: タブを順序タブに切り替えました');
+      
+      // 現在の選択と初期順序を考慮して最適な順序を計算
+      const selectedAppsInInitialOrder = initialOrderedAppIds
+        .filter(id => selectedIds.includes(id));
+        
+      // 選択されているが初期順序にないIDを追加
+      const remainingSelectedIds = selectedIds
+        .filter(id => !initialOrderedAppIds.includes(id));
+        
+      // 合体させて新しい順序を生成
+      const newOrderedIds = [...selectedAppsInInitialOrder, ...remainingSelectedIds];
+      
+      console.log('Settings dialog: 順序を再計算しました', newOrderedIds);
+      setOrderedIds(newOrderedIds);
+    }
+  };
 
   const handleSelectionChange = (appId: string) => {
     setSelectedIds(prev => {
@@ -57,6 +83,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   };
 
   const handleOrderChange = useCallback((newOrder: string[]) => {
+    console.log('Settings dialog: 新しい並び順を受け取りました', newOrder);
     setOrderedIds(newOrder);
   }, []);
 
@@ -65,7 +92,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     // Guests save based on selection unless ordered; logged-in save based on order filtered by selection.
     let finalSelectionToSave: string[];
     if (!isUserLoggedIn) {
-      if (orderedIds.length > 0 && orderedIds.some(id => initialOrderedAppIds.includes(id))) { // Check if order was manually changed
+      if (orderedIds.length > 0 && orderedIds.some(id => selectedIds.includes(id))) {
         finalSelectionToSave = orderedIds.filter(id => selectedIds.includes(id));
       } else {
         finalSelectionToSave = [...selectedIds];
@@ -73,15 +100,33 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     } else {
       finalSelectionToSave = orderedIds.filter(id => selectedIds.includes(id));
     }
-    onSave(finalSelectionToSave, orderedIds);
+    
+    // 現在選択されているIDと並べ替えられた順序を優先順位付きで保存
+    const finalOrderedIds = [...orderedIds.filter(id => selectedIds.includes(id))];
+    
+    // 選択されているが、並び順に含まれていないIDがあれば追加
+    selectedIds.forEach(id => {
+      if (!finalOrderedIds.includes(id)) {
+        finalOrderedIds.push(id);
+      }
+    });
+    
+    console.log('Settings dialog: 保存します', {
+      selectedIds,
+      orderedIds,
+      finalSelectionToSave,
+      finalOrderedIds
+    });
+    
+    onSave(finalSelectionToSave, finalOrderedIds);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>決済アプリの設定</DialogTitle>
-          <Tabs defaultValue="select" className="pt-2">
+          <DialogTitle>ポイントアプリの設定</DialogTitle>
+          <Tabs defaultValue="select" className="pt-2" onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="select">
                 <CirclePlus className="mr-1 h-4 w-4" /> アプリ選択
@@ -92,25 +137,33 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </TabsList>
             <TabsContent value="select" className="pt-4">
               <DialogDescription>
-                利用したいQR決済アプリを選択してください。
+                利用したいポイントアプリを選択してください。
               </DialogDescription>
-              {/* App Selection Grid */} 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4 max-h-60 overflow-y-auto pr-2">
-                {(allPaymentApps || []).map((app: PaymentApp) => (
+              {/* App Selection List - 一行一アプリのリストに変更 */} 
+              <div className="flex flex-col space-y-2 py-4 max-h-60 overflow-y-auto pr-2">
+                {(allPaymentApps || []).map((app: PointApp) => (
                   <div
                     key={app.id}
-                    className={`relative p-3 border rounded-lg cursor-pointer transition-all duration-200 ${selectedIds.includes(app.id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/30'}`}
+                    className={`relative p-3 border rounded-lg cursor-pointer transition-all duration-200 flex items-center ${selectedIds.includes(app.id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/30'}`}
                     onClick={() => handleSelectionChange(app.id)}
                   >
-                    <div className="absolute top-1 right-1 z-10">
-                      <CheckCircle className={`h-4 w-4 text-primary opacity-0 transition-opacity ${selectedIds.includes(app.id) ? 'opacity-100' : ''}`} />
-                    </div>
-                    <div className="flex flex-col items-center text-center space-y-2">
+                    <div className="flex-shrink-0 mr-3">
                       {app.logo_url ? (
-                        <div className="w-12 h-12 relative"><Image src={app.logo_url} alt={app.name} width={48} height={48} style={{ objectFit: 'contain', width: '100%', height: '100%' }} className="rounded-md"/></div>
-                      ) : ( <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center shadow-sm"><span className="text-gray-500 text-lg font-bold">{app.name.charAt(0)}</span></div> )}
-                      <span className="text-xs font-medium">{app.name}</span>
+                        <Image 
+                          src={app.logo_url} 
+                          alt={app.name} 
+                          width={32} 
+                          height={32} 
+                          className="rounded-md object-contain"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center shadow-sm">
+                          <span className="text-gray-500 text-md font-bold">{app.name.charAt(0)}</span>
+                        </div>
+                      )}
                     </div>
+                    <span className="flex-grow font-medium text-sm">{app.name}</span>
+                    <CheckCircle className={`h-5 w-5 text-primary transition-opacity ml-2 ${selectedIds.includes(app.id) ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
                 ))}
               </div>
