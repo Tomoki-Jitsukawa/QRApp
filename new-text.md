@@ -61,13 +61,14 @@ graph TD
 
         Dashboard --> AuthHook[useAuth (app/hooks/useAuth.ts)]
         Dashboard --> PaymentAppsHook[usePaymentApps (app/hooks/usePaymentApps.ts)]
+        Dashboard --> QRRecognition[useQRCodeRecognition (app/hooks/useQRCodeRecognition.ts)]
         
         Card --> |アプリ起動指示| DeepLinkLib["DeepLink Logic (lib/deepLink.ts)"]
         DeepLinkLib --> PaymentAppsExtern["QR決済アプリ (外部)"]
         DeepLinkLib --> AppStore["アプリストア (外部)"]
         
-        Dashboard --> |カメラAPIアクセス| BrowserCameraAPI[Web Camera API (getUserMedia)]
-        Dashboard --> |画像認識要求| RecognizeAPI["API Route: /api/recognize-image"]
+        QRRecognition --> |カメラAPIアクセス| BrowserCameraAPI[Web Camera API (getUserMedia)]
+        QRRecognition --> |画像認識要求| RecognizeAPI["API Route: /api/recognize-image"]
         
         AuthHook --> SupabaseClient["Supabase Client (lib/supabase.ts)"]
         PaymentAppsHook --> SupabaseClient
@@ -94,7 +95,7 @@ graph TD
 
 *   `Dashboard.tsx` が中心的な役割を果たし、各種UIコンポーネント、カスタムフック、API呼び出しを統合。
 *   認証状態は `useAuth` フック、決済アプリデータ（一覧、ユーザー設定、優先度）は `usePaymentApps` フックで管理。
-*   カメラ機能、画像認識API呼び出し、結果処理は `Dashboard.tsx` 内に実装されている (**注意:** `useQRCodeRecognition.ts` フックは現存しない)。
+*   カメラ機能、画像認識API呼び出し、結果処理は `useQRCodeRecognition.ts` フックを通じて実装。
 *   外部API (Gemini) との連携は、セキュリティのためNext.js API Route (`/api/recognize-image`) を介して行う。
 *   ユーザーごとの決済アプリ設定（優先度含む）の更新もAPI Route (`/api/payment-apps`) 経由で行われる可能性がある（`usePaymentApps.ts` の実装による）。
 
@@ -120,7 +121,8 @@ qr-app/
 │   │   └── SettingsDialog.tsx # 設定モーダル (アプリ選択と優先度設定を内包)
 │   ├── hooks/               # カスタムReactフック
 │   │   ├── useAuth.ts         # 認証状態とユーザー情報を管理
-│   │   └── usePaymentApps.ts  # 全決済アプリ一覧、ユーザー選択アプリ、優先度、保存/更新処理
+│   │   ├── usePaymentApps.ts  # 全決済アプリ一覧、ユーザー選択アプリ、優先度、保存/更新処理
+│   │   └── useQRCodeRecognition.ts # カメラ撮影、画像認識API呼び出し、結果処理
 │   ├── lib/                 # ライブラリ初期化、ユーティリティ関数
 │   │   ├── deepLink.ts        # モバイルアプリ起動ロジック (URLスキーム, ストア誘導)
 │   │   └── supabase.ts        # Supabaseクライアント初期化・インスタンス
@@ -147,7 +149,8 @@ qr-app/
     *   認証状態 (`useAuth`) と決済アプリデータ (`usePaymentApps`) をフックから取得・管理。
     *   `PaymentAppGrid` を使用して選択されたアプリを表示。
     *   カメラ起動ボタン、設定ボタンのイベントハンドリング。
-    *   **カメラ機能 (`CameraCapture`)、画像認識API呼び出し、認識結果と優先度に基づいたアプリ起動ロジックを内包。**
+    *   `useQRCodeRecognition` フックを使用してカメラ機能と画像認識を処理。
+    *   認識結果と優先度に基づいたアプリ起動ロジックを実装。
     *   ゲストモード時の初期アプリ選択 (`AppSelector`) の表示制御。
     *   ローディング状態、エラー状態の管理と表示。
 *   **`app/components/PaymentAppGrid.tsx`**: `usePaymentApps` から受け取ったユーザー選択済みの決済アプリリスト（優先度順）を元に、`PaymentAppCard` をグリッドレイアウトで表示。
@@ -167,16 +170,20 @@ qr-app/
     *   ログイン状態の変化を監視し、関連コンポーネントに提供。
     *   ログイン、ログアウト処理の関数を提供。
 *   **`app/hooks/usePaymentApps.ts`**:
-    *   Supabaseから全決済アプリマスタ (`payment_apps`) を取得 (SWR利用)。
-    *   ログインユーザーの場合、Supabaseからユーザーが選択・設定した決済アプリ情報 (`user_payment_apps` - 優先度含む) を取得 (SWR利用)。
+    *   環境設定に応じてSupabaseまたはREST APIから全決済アプリマスタを取得。
+    *   ログインユーザーの場合、Supabaseからユーザーが選択・設定した決済アプリ情報を取得。
     *   ゲストモードの場合、ローカルストレージから選択・優先度情報を読み込み/書き込み。
     *   ユーザーが選択したアプリリストと、優先度順にソートされた表示用アプリリストを計算・提供。
-    *   設定変更（アプリ選択、優先度）をSupabaseまたはローカルストレージに保存するための関数 (`updateUserPaymentApps` 等) を提供。
+    *   設定変更（アプリ選択、優先度）をSupabaseまたはローカルストレージに保存するための関数を提供。
+*   **`app/hooks/useQRCodeRecognition.ts`**:
+    *   カメラで撮影した画像を処理し、APIに送信する機能を提供。
+    *   画像認識APIの呼び出しと結果処理を担当。
+    *   認識結果や認識エラーの状態管理を行い、外部コールバック関数の設定も可能。
 
 ## 7. APIルート解説
 
 *   **`app/api/recognize-image/route.ts` (POST)**:
-    *   `Dashboard` から送信された画像データ (Data URL) を受け取る。
+    *   `useQRCodeRecognition` フックから送信された画像データ (Data URL) を受け取る。
     *   環境変数に設定された `GEMINI_API_KEY` を使用して Google AI Gemini API (`gemini-1.5-flash-latest`) を呼び出す。
     *   プロンプトで画像内の決済サービス名をJSON配列で返すよう指示。
     *   Gemini APIからの応答（Markdown形式でラップされている場合も考慮しJSONを抽出）をパースし、認識されたサービス名の配列 (`{ services: ["PayPay", "楽天ペイ"] }`) をクライアント (Dashboard) に返す。
@@ -270,16 +277,17 @@ USING (auth.uid() = user_id);
 
 1.  **カメラ起動**: `Dashboard` のカメラボタンをクリック。
 2.  **撮影**: `CameraCapture` モーダルが表示され、ユーザーが撮影ボタンをクリック。撮影された画像データ (Data URL) を `Dashboard` に渡す。
-3.  **画像認識API呼び出し (`Dashboard`)**:
-    *   ローディング状態 (`isRecognizing`) を true に設定。
+3.  **画像認識API呼び出し**:
+    *   `Dashboard` が `useQRCodeRecognition` フックの `startRecognition` 関数を呼び出す。
+    *   フック内でローディング状態 (`isRecognizing`) を true に設定。
     *   取得した画像データを `/api/recognize-image` エンドポイントにPOSTリクエストで送信。
 4.  **API処理 (`/api/recognize-image`)**:
     *   Gemini APIを呼び出し、画像から決済サービス名を抽出。
     *   結果 (サービス名配列) をJSONで返す。
-5.  **結果処理 (`Dashboard`)**:
-    *   APIから返された認識結果 (サービス名配列 `recognizedServices`) を受け取る。
-    *   ローディング状態を false に設定。
-    *   `usePaymentApps` から取得したユーザー設定の優先度付きアプリリスト (`appsToDisplay`) と `recognizedServices` を照合。
+5.  **結果処理**:
+    *   APIから返された認識結果 (サービス名配列) を `useQRCodeRecognition` が受け取り、内部状態を更新。
+    *   成功時、フックに登録されたコールバック関数 (`handleRecognitionResult`) が `Dashboard` で実行される。
+    *   `Dashboard` は `usePaymentApps` から取得したユーザー設定の優先度付きアプリリスト (`appsToDisplay`) と認識結果 (`recognizedServices`) を照合。
         *   `recognizedServices` の各サービス名（小文字化）と `appsToDisplay` の各アプリ名（小文字化）を比較。
         *   一致したアプリのうち、`appsToDisplay` 内での優先度 (priority) が最も高いものを特定。
     *   **最適なアプリが見つかった場合**: `lib/deepLink.ts` の起動関数を呼び出し、そのアプリを起動しようとする。
