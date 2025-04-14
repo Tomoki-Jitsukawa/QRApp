@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { XCircle, ScanEye } from 'lucide-react';
 import PrioritySettings from './PrioritySettings';
 import { ListOrdered } from 'lucide-react';
-import { useQRCodeRecognition, RecognitionResult, RecognitionError } from '../../hooks/useQRCodeRecognition';
+import { useQRCodeRecognition, RecognitionResult, RecognitionError } from '../hooks/useQRCodeRecognition';
 import { AppSelector } from './AppSelector';
 import { PaymentAppGrid } from './PaymentAppGrid';
 import { SettingsDialog } from './SettingsDialog';
