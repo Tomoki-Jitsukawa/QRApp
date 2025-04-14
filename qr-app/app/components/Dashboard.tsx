@@ -75,15 +75,25 @@ export default function Dashboard() {
      }
      else if (!user && selectedApps.length > 0 && paymentApps.length > 0) {
         const appMap = new Map(paymentApps.map((app: PointApp) => [app.id, app]));
-        const guestApps = selectedApps
-            .map(id => appMap.get(id))
-            .filter((app): app is PointApp => !!app);
+        
+        // orderedAppIdsが存在する場合は、それを優先的に使用
+        // orderedAppIdsに含まれていないIDは後ろに追加
+        const orderedIds = orderedAppIds.length > 0
+          ? [...orderedAppIds, ...selectedApps.filter(id => !orderedAppIds.includes(id))]
+          : selectedApps;
+          
+        // 優先度順にソートされたアプリを返す
+        const guestApps = orderedIds
+          .filter(id => selectedApps.includes(id))
+          .map(id => appMap.get(id))
+          .filter((app): app is PointApp => !!app);
+          
         return guestApps;
      }
      else {
        return [];
      }
-   }, [user, isUserAppsLoading, userPointApps, selectedApps, paymentApps]);
+   }, [user, isUserAppsLoading, userPointApps, selectedApps, paymentApps, orderedAppIds]);
 
   // --- 認識成功時のコールバック ---
   const handleRecognitionResult = useCallback((result: RecognitionResult) => {
@@ -144,6 +154,23 @@ export default function Dashboard() {
     // capturedImage や recognitionError は useQRCodeRecognition フック側でリセットされる
     setIsCameraDialogOpen(true); // 状態リセットの後にダイアログを開く
   };
+
+  // ゲストユーザーのために初期順序を設定する
+  useEffect(() => {
+    if (!user) {
+      const savedOrderedIds = localStorage.getItem('guestOrderedPointAppIds');
+      if (savedOrderedIds) {
+        try {
+          const parsedOrderedIds = JSON.parse(savedOrderedIds);
+          if (JSON.stringify(parsedOrderedIds) !== JSON.stringify(orderedAppIds)) {
+            setOrderedAppIds(parsedOrderedIds);
+          }
+        } catch (e) {
+          console.error('Error parsing ordered app IDs:', e);
+        }
+      }
+    }
+  }, [user, orderedAppIds]);
 
   // <<< userPointApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
   useEffect(() => {
@@ -213,6 +240,7 @@ export default function Dashboard() {
     if (!user) {
       // console.log('[handleSaveSettings] ゲストユーザーとして保存中...'); // ログ削除済み
       localStorage.setItem('guestSelectedPointApps', JSON.stringify(finalSelectionToSave));
+      localStorage.setItem('guestOrderedPointAppIds', JSON.stringify(finalOrderedIds));
       setSelectedApps(finalSelectionToSave); // ローカル状態を更新
       setOrderedAppIds(finalOrderedIds); // ローカルの順序状態を更新
       setShowAppSelector(false);
