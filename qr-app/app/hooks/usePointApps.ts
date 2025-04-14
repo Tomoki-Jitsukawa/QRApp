@@ -29,12 +29,31 @@ export function useUserPointApps() {
     if (typeof window === 'undefined') return [];
     
     try {
-      const savedApps = localStorage.getItem('guestSelectedPointApps'); // 変更: キー名
+      const savedApps = localStorage.getItem('guestSelectedPointApps');
+      const savedOrder = localStorage.getItem('guestOrderedPointAppIds');
+      
       if (savedApps) {
         const selectedIds = JSON.parse(savedApps) as string[];
+        let orderedIds: string[] = [];
         
-        // 選択されたIDに対応するアプリを返す
-        return selectedIds.map((id, index) => {
+        // 優先度情報を取得
+        if (savedOrder) {
+          try {
+            orderedIds = JSON.parse(savedOrder);
+            // 存在するIDのみを使用
+            orderedIds = orderedIds.filter(id => selectedIds.includes(id));
+          } catch (e) {
+            console.error('Error parsing ordered IDs:', e);
+          }
+        }
+        
+        // 並び順が存在する場合はそれを使用し、ない場合は選択順
+        const finalOrderedIds = orderedIds.length > 0 
+          ? [...orderedIds, ...selectedIds.filter(id => !orderedIds.includes(id))]
+          : selectedIds;
+        
+        // 優先度順に並び替えてUserPointApp配列を作成
+        return finalOrderedIds.map((id, index) => {
           const app = pointApps.find((a: PointApp) => a.id === id);
           if (!app) return null;
           
@@ -156,11 +175,18 @@ export function useUserPointApps() {
     } else {
       // ゲストモード
       const currentData = data || [];
-      const sortedIds = updatedApps
-        .sort((a, b) => a.priority - b.priority)
-        .map(app => app.id.replace('guest-', ''));
       
+      // 優先度順に並び替え
+      const sortedApps = [...updatedApps].sort((a, b) => a.priority - b.priority);
+      
+      // IDのみの配列を抽出（guest-プレフィックスを削除）
+      const sortedIds = sortedApps.map(app => app.id.replace('guest-', ''));
+      
+      // 両方のストレージに保存
       localStorage.setItem('guestSelectedPointApps', JSON.stringify(sortedIds));
+      localStorage.setItem('guestOrderedPointAppIds', JSON.stringify(sortedIds));
+      
+      console.log('優先度更新: ローカルストレージに保存しました', sortedIds);
       
       await mutate();
     }

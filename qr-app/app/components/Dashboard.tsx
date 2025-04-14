@@ -162,15 +162,14 @@ export default function Dashboard() {
       if (savedOrderedIds) {
         try {
           const parsedOrderedIds = JSON.parse(savedOrderedIds);
-          if (JSON.stringify(parsedOrderedIds) !== JSON.stringify(orderedAppIds)) {
-            setOrderedAppIds(parsedOrderedIds);
-          }
+          setOrderedAppIds(parsedOrderedIds);
+          console.log('ゲストの優先度情報を読み込みました:', parsedOrderedIds);
         } catch (e) {
           console.error('Error parsing ordered app IDs:', e);
         }
       }
     }
-  }, [user, orderedAppIds]);
+  }, [user]);
 
   // <<< userPointApps に基づいて初期順序のみを設定するように useEffect を変更 >>>
   useEffect(() => {
@@ -325,6 +324,14 @@ export default function Dashboard() {
     priority: index,
     is_active: true
   }));
+  
+  // デバッグ情報
+  console.log('表示されるアプリ情報:', {
+    orderedAppIds,
+    selectedApps,
+    displayAppsCount: displayApps.length,
+    displayUserAppsCount: displayUserApps.length
+  });
   // --- レンダリング用データ導出 --- 終了 ---
 
   return (

@@ -1,7 +1,7 @@
 'use client';
 
 import { UserPointApp } from '../types';
-import PointAppCard from './PointAppCard';
+import { openPaymentApp } from '../lib/deepLink';
 
 interface PointAppGridProps {
   apps: UserPointApp[];
@@ -32,8 +32,22 @@ export default function PointAppGrid({ apps, isLoading = false }: PointAppGridPr
     );
   }
   
-  // 優先度でソート
+  // 優先度でソート (確実にソートするためのダブルチェック)
   const sortedApps = [...apps].sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity));
+  
+  // デバッグ情報
+  console.log('PointAppGrid - 表示するアプリ:', sortedApps.map(app => ({
+    id: app.id,
+    name: app.point_app?.name,
+    priority: app.priority
+  })));
+  
+  // アプリを起動する関数
+  const handleAppLaunch = (userApp: UserPointApp) => {
+    if (userApp.point_app) {
+      openPaymentApp(userApp.point_app);
+    }
+  };
   
   return (
     <div className="flex flex-col space-y-3 p-4">
@@ -60,7 +74,7 @@ export default function PointAppGrid({ apps, isLoading = false }: PointAppGridPr
               <p className="text-xs text-gray-500 dark:text-gray-400">優先度: {index + 1}</p>
             </div>
             <button 
-              onClick={() => userApp.point_app && window.open(userApp.point_app.ios_url_scheme, '_blank')}
+              onClick={() => handleAppLaunch(userApp)}
               className="ml-auto bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium"
             >
               起動
