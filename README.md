@@ -32,7 +32,7 @@
   - QRコード生成: qrcode.react
   - アイコン: Lucide React
   - フォーム管理: React Hook Form
-  - バリデーション: Zod
+  - バリデーション: Zod 
   - 通知: Sonner
 
 ## アーキテクチャ概要
