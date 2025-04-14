@@ -80,7 +80,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>決済アプリの設定</DialogTitle>
+          <DialogTitle>ポイントアプリの設定</DialogTitle>
           <Tabs defaultValue="select" className="pt-2">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="select">
@@ -92,7 +92,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </TabsList>
             <TabsContent value="select" className="pt-4">
               <DialogDescription>
-                利用したいQR決済アプリを選択してください。
+                利用したいポイントアプリを選択してください。
               </DialogDescription>
               {/* App Selection Grid */} 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4 max-h-60 overflow-y-auto pr-2">

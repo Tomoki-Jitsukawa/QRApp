@@ -230,7 +230,7 @@ export default function Dashboard() {
       // 保存成功後にローカルの順序状態を更新
       setOrderedAppIds(finalOrderedIds);
       setShowAppSelector(false);
-      toast.success('決済アプリの設定を保存しました');
+      toast.success('ポイントアプリの設定を保存しました');
       setIsSettingsDialogOpen(false);
       // console.log('[handleSaveSettings] ログインユーザー保存API呼び出し完了.'); // ログ削除済み
     } catch (error) {
@@ -317,9 +317,9 @@ export default function Dashboard() {
                 </DialogTrigger>
                 <DialogContent className="max-w-sm">
                   <DialogHeader>
-                    <DialogTitle>カメラで決済サービスを認識</DialogTitle>
+                    <DialogTitle>カメラでポイントサービスを認識</DialogTitle>
                     <DialogDescription>
-                      お店のロゴなどを撮影して、利用可能な決済サービスを認識します。
+                      お店のロゴなどを撮影して、利用可能なポイントサービスを認識します。
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto">
