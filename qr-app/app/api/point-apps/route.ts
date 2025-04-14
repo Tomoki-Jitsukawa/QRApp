@@ -19,10 +19,10 @@ const pointApps: PointApp[] = [
     name: '楽天ポイント',
     logo_url: '/images/rakuten_point_logo.png',
     web_url: 'https://point.rakuten.co.jp/',
-    ios_url_scheme: 'rakuten://',
-    android_url_scheme: 'rakuten://',
-    app_store_url: 'https://apps.apple.com/jp/app/%E6%A5%BD%E5%A4%A9%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%AF%E3%83%A9%E3%83%96/id1094107454',
-    play_store_url: 'https://play.google.com/store/apps/details?id=jp.co.rakuten.pointclub',
+    ios_url_scheme: 'rakutenpay://',
+    android_url_scheme: 'rakutenpay://',
+    app_store_url: 'https://apps.apple.com/jp/app/%E6%A5%BD%E5%A4%A9%E3%83%9A%E3%82%A4-%E6%A5%BD%E5%A4%A9%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%AB%E3%83%BC%E3%83%89/id1139755229',
+    play_store_url: 'https://play.google.com/store/apps/details?id=jp.co.rakuten.pay',
     api_available: false
   },
   {

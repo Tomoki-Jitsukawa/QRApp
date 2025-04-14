@@ -61,7 +61,7 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
         </CardHeader>
         <CardContent className="space-y-4">
             {allPaymentApps.map((app) => (
-                <div key={app.id} className="flex items-center justify-between">
+                <div key={app.id} className="flex items-center justify-between p-3 border rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
                     <div className="flex items-center space-x-3">
                         {app.logo_url ? (
                             <Image 
@@ -100,7 +100,10 @@ export const AppSelector: React.FC<AppSelectorProps> = ({
                 </div>
             ))}
         </CardContent>
-        <CardFooter className="justify-end">
+        <CardFooter className="justify-between pt-4 border-t mt-4">
+            <div className="text-sm text-muted-foreground">
+                {selectedAppIds.length} アプリを選択中
+            </div>
             <Button 
                 onClick={onConfirm}
                 disabled={isSaving || selectedAppIds.length === 0}
